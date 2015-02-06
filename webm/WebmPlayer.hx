@@ -34,7 +34,7 @@ class WebmPlayer extends Bitmap
 	var playing = false;
 	var renderedCount = 0;
 
-	public function new(resource:String)
+	public function new(io:WebmIo)
 	{
 		super(null);
 
@@ -50,7 +50,6 @@ class WebmPlayer extends Bitmap
 
 		vpxDecoder = new VpxDecoder();
 
-		var io = new WebmIoFile(resource);
 		webmDecoder = hx_webm_decoder_create(io.io);
 		
 		var info = hx_webm_decoder_get_info(webmDecoder);
