@@ -1,154 +1,160 @@
 package webm;
-import haxe.io.Bytes;
-import haxe.io.BytesData;
+
+import cpp.Lib;
 import flash.display.Bitmap;
 import flash.display.BitmapData;
 import flash.display.PixelSnapping;
-import flash.display.Sprite;
 import flash.events.Event;
-import flash.events.EventDispatcher;
 import flash.events.SampleDataEvent;
 import flash.media.Sound;
 import flash.utils.ByteArray;
 import flash.utils.Endian;
-import webm.internal.WebmUtils;
+import haxe.io.Bytes;
+import haxe.io.BytesData;
 
-class WebmPlayer extends EventDispatcher {
-	var webm:Webm;
-	var io:WebmIo;
-	var targetSprite:Sprite;
-	var bitmap:Bitmap;
-	var bitmapData:BitmapData;
-	var decoder:Dynamic;
-	var startTime:Float = 0;
-	var lastDecodedVideoFrame:Float = 0;
-	var playing:Bool = false;
-	var renderedCount:Int = 0;
-	
-	public var width:Int;
-	public var height:Int;
-	public var frameRate:Float;
-	public var duration:Float;
-	
-	var sound:Sound;
+using Std;
 
-	public function new(io:WebmIo, targetSprite:Sprite) {
-		super();
-		this.io = io;
-		this.targetSprite = targetSprite;
-		this.webm = new Webm();
-		this.decoder = hx_webm_decoder_create(io.io);
-		var info = hx_webm_decoder_get_info(this.decoder);
-		this.width = info[0];
-		this.height = info[1];
-		this.frameRate = info[2];
-		this.duration = info[3];
-		this.bitmapData = new BitmapData(this.width, this.height);
-		this.bitmap = new Bitmap(this.bitmapData, PixelSnapping.AUTO, true);
-		targetSprite.addChild(this.bitmap);
-		this.outputSound = new ByteArray();
-		this.outputSound.endian = Endian.LITTLE_ENDIAN;
-		this.sound = new Sound();
-		this.sound.addEventListener(SampleDataEvent.SAMPLE_DATA, generateSound);
-		this.sound.play();
-	}
-	
-	public var amp_multiplier_right:Float = 0.5;
-	public var amp_multiplier_left:Float = 0.5;
-	//public var freq_right:Float = 580;
-	//public var freq_left:Float = 580;
+class WebmPlayer extends Bitmap
+{
+	static inline var BYTES_PER_SAMPLE = 4 * 8192;
+	static var BLANK_BYTES:ByteArray;
 
-	inline public static var SAMPLING_RATE:Int = 44100;
-	//inline public static var TWO_PI:Float = 2*Math.PI;
-	//inline public static var TWO_PI_OVER_SR:Float = TWO_PI/SAMPLING_RATE;
+	public var frameRate(default, null):Float;
+	public var duration(default, null):Float;
+
+	var vpxDecoder:VpxDecoder;
+	var webmDecoder:Dynamic;
 	var outputSound:ByteArray;
+	var sound:Sound;
 	
-	public function generateSound(e:SampleDataEvent):Void {
+	var startTime = 0.0;
+	var lastDecodedVideoFrame = 0.0;
+	var playing = false;
+	var renderedCount = 0;
 
-		var samplel:Float;
-		var sampler:Float;
+	public function new(resource:String)
+	{
+		super(null);
+
+		if (BLANK_BYTES == null)
+		{
+			BLANK_BYTES = new ByteArray();
+			for (i in 0...BYTES_PER_SAMPLE)
+				BLANK_BYTES.writeByte(0);
+		}
+
+		pixelSnapping = PixelSnapping.AUTO;
+		smoothing = true;
+
+		vpxDecoder = new VpxDecoder();
+
+		var io = new WebmIoFile(resource);
+		webmDecoder = hx_webm_decoder_create(io.io);
 		
-		for (i in 0 ... 8192) {
-			//samplel = Math.sin((i + e.position) * TWO_PI_OVER_SR * freq_left);
-			//sampler = Math.sin((i + e.position) * TWO_PI_OVER_SR * freq_right);
-			if (this.outputSound.bytesAvailable >= 8) {
-				samplel = this.outputSound.readFloat();
-				sampler = this.outputSound.readFloat();
-				//trace(samplel + " : " + sampler);
-				//trace(this.outputSound.bytesAvailable);
-			} else {
-				samplel = sampler = 0;
+		var info = hx_webm_decoder_get_info(webmDecoder);
+		bitmapData = new BitmapData(info[0].int(), info[1].int());
+		frameRate = info[2];
+		duration = info[3];
+
+		outputSound = new ByteArray();
+		outputSound.endian = Endian.LITTLE_ENDIAN;
+		
+		sound = new Sound();
+		sound.addEventListener(SampleDataEvent.SAMPLE_DATA, generateSound);
+		sound.play();
+	}
+
+	public function generateSound(e:SampleDataEvent)
+	{
+		if (e.data == null)
+			e.data = new ByteArray();
+
+		var totalOutputLength = outputSound.length;
+		var outputBytesToWrite = Math.min(totalOutputLength, BYTES_PER_SAMPLE).int();
+		var blankBytesToWrite = BYTES_PER_SAMPLE - outputBytesToWrite;
+
+		if (blankBytesToWrite > 0)
+			e.data.writeBytes(BLANK_BYTES, 0, blankBytesToWrite);
+
+		if (outputBytesToWrite > 0)
+		{
+			e.data.writeBytes(outputSound, 0, outputBytesToWrite);
+
+			if (outputBytesToWrite < totalOutputLength)
+			{
+				var remainingBytes = new ByteArray();
+				remainingBytes.writeBytes(outputSound, outputBytesToWrite);
+				outputSound = remainingBytes;
 			}
-
-			e.data.writeFloat(samplel * amp_multiplier_left);
-			e.data.writeFloat(sampler * amp_multiplier_right);
+			else
+			{
+				outputSound.clear();
+			}
 		}
-		
-		this.outputSound.clear();
 	}
 	
-	public function getElapsedTime():Float {
-		return haxe.Timer.stamp() - this.startTime;
+	public function getElapsedTime():Float
+	{
+		return haxe.Timer.stamp() - startTime;
 	}
 	
-	public function play() {
-		if (!playing) {
-			this.startTime = haxe.Timer.stamp();
+	public function play()
+	{
+		if (!playing)
+		{
+			startTime = haxe.Timer.stamp();
 
-			this.targetSprite.addEventListener("enterFrame", onSpriteEnterFrame);
+			addEventListener(Event.ENTER_FRAME, onSpriteEnterFrame);
 			playing = true;
-			this.dispatchEvent(new Event('play'));
+			dispatchEvent(new Event('play'));
 		}
 	}
 
-	public function stop() {
-		if (playing) {
-			this.targetSprite.removeEventListener("enterFrame", onSpriteEnterFrame);
+	public function stop()
+	{
+		if (playing)
+		{
+			removeEventListener(Event.ENTER_FRAME, onSpriteEnterFrame);
 			playing = false;
-			this.dispatchEvent(new Event('stop'));
+			dispatchEvent(new Event('stop'));
 		}
 	}
 	
-	private function onSpriteEnterFrame(e:Event) {
+	function onSpriteEnterFrame(e:Event)
+	{
 		var startRenderedCount = renderedCount;
 
-		while (hx_webm_decoder_has_more(decoder) && lastDecodedVideoFrame < getElapsedTime()) {
-		//while (hx_webm_decoder_has_more(decoder)) {
-			hx_webm_decoder_step(decoder, decodeVideoFrame, outputAudioFrame);
+		while (hx_webm_decoder_has_more(webmDecoder) && lastDecodedVideoFrame < getElapsedTime())
+		{
+			hx_webm_decoder_step(webmDecoder, decodeVideoFrame, outputAudioFrame);
 			if (renderedCount > startRenderedCount) break;
 		}
 		
-		if (!hx_webm_decoder_has_more(decoder)) {
-			this.dispatchEvent(new Event('end'));
+		if (!hx_webm_decoder_has_more(webmDecoder))
+		{
+			dispatchEvent(new Event('end'));
 			stop();
 		}
 	}
 
-	private function decodeVideoFrame(time:Float, data:BytesData):Void {
+	function decodeVideoFrame(time:Float, data:BytesData)
+	{
 		lastDecodedVideoFrame = time;
-		renderedCount++;
+		++renderedCount;
 		
-		//trace("DECODE VIDEO FRAME! " + getElapsedTime() + ":" + time);
-		var decodeTime:Float = WebmUtils.measureTime(function() {
-			webm.decode(ByteArray.fromBytes(Bytes.ofData(data)));
-		});
-		var renderTime:Float = WebmUtils.measureTime(function() {
-			webm.getAndRenderFrame(this.bitmapData);
-		});
-		
-		//trace("Profiling Times: decode=" + decodeTime + " ; render=" + renderTime);
+		vpxDecoder.decode(ByteArray.fromBytes(Bytes.ofData(data)));
+		vpxDecoder.getAndRenderFrame(bitmapData);
 	}
 	
-	private function outputAudioFrame(time:Float, data:BytesData):Void {
-		var byteArray:ByteArray = ByteArray.fromBytes(Bytes.ofData(data));
-		this.outputSound.position = this.outputSound.length;
-		this.outputSound.writeBytes(byteArray, 0, byteArray.length);
-		this.outputSound.position = 0;
-		//trace("DECODE AUDIO FRAME! " + getElapsedTime() + ":" + time);
+	function outputAudioFrame(time:Float, data:BytesData)
+	{
+		outputSound.position = outputSound.length;
+		outputSound.writeBytes(ByteArray.fromBytes(Bytes.ofData(data)));
+		outputSound.position = 0;
 	}
 	
-	static var hx_webm_decoder_create = cpp.Lib.load("openfl-webm", "hx_webm_decoder_create", 1);
-	static var hx_webm_decoder_get_info = cpp.Lib.load("openfl-webm", "hx_webm_decoder_get_info", 1);
-	static var hx_webm_decoder_has_more = cpp.Lib.load("openfl-webm", "hx_webm_decoder_has_more", 1);
-	static var hx_webm_decoder_step = cpp.Lib.load("openfl-webm", "hx_webm_decoder_step", 3);
+	static var hx_webm_decoder_create:Dynamic -> Dynamic = Lib.load("openfl-webm", "hx_webm_decoder_create", 1);
+	static var hx_webm_decoder_get_info:Dynamic -> Array<Float> = Lib.load("openfl-webm", "hx_webm_decoder_get_info", 1);
+	static var hx_webm_decoder_has_more:Dynamic -> Bool = Lib.load("openfl-webm", "hx_webm_decoder_has_more", 1);
+	static var hx_webm_decoder_step = Lib.load("openfl-webm", "hx_webm_decoder_step", 3);
 }
