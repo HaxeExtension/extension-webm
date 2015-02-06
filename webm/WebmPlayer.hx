@@ -109,7 +109,7 @@ class WebmPlayer extends Bitmap
 		
 			addEventListener(Event.ENTER_FRAME, onSpriteEnterFrame);
 			playing = true;
-			dispatchEvent(new Event('play'));
+			dispatchEvent(new WebmEvent(WebmEvent.PLAY));
 		}
 	}
 
@@ -118,7 +118,7 @@ class WebmPlayer extends Bitmap
 		if (playing)
 		{
 			playing = false;
-			dispatchEvent(new Event('stop'));
+			dispatchEvent(new WebmEvent(WebmEvent.STOP));
 			dispose();
 		}
 	}
@@ -135,7 +135,7 @@ class WebmPlayer extends Bitmap
 		
 		if (!hx_webm_decoder_has_more(webmDecoder))
 		{
-			dispatchEvent(new Event('end'));
+			dispatchEvent(new WebmEvent(WebmEvent.COMPLETE));
 			stop();
 		}
 	}
