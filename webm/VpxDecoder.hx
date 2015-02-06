@@ -21,9 +21,9 @@ class VpxDecoder
 		context = hx_vpx_codec_dec_init();
 	}
 	
-	public function decode(data:ByteArray):Array<Int>
+	public function decode(data:BytesData)
 	{
-		return hx_vpx_codec_decode(context, data.getData());
+		hx_vpx_codec_decode(context, data);
 	}
 	
 	public function getAndRenderFrame(bitmapData:BitmapData)

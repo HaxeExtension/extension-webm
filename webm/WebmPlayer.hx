@@ -144,7 +144,7 @@ class WebmPlayer extends Bitmap
 		lastDecodedVideoFrame = time;
 		++renderedCount;
 		
-		vpxDecoder.decode(ByteArray.fromBytes(Bytes.ofData(data)));
+		vpxDecoder.decode(data);
 		vpxDecoder.getAndRenderFrame(bitmapData);
 	}
 	
