@@ -1,8 +1,8 @@
 package webm;
 
 import cpp.Lib;
-import flash.display.BitmapData;
-import flash.utils.ByteArray;
+import openfl.display.BitmapData;
+import openfl.utils.ByteArray;
 import haxe.io.Bytes;
 import haxe.io.BytesData;
 

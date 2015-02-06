@@ -1,16 +1,17 @@
 package webm;
 
 import cpp.Lib;
-import flash.display.Bitmap;
-import flash.display.BitmapData;
-import flash.display.PixelSnapping;
-import flash.events.Event;
-import flash.events.SampleDataEvent;
-import flash.media.Sound;
-import flash.utils.ByteArray;
-import flash.utils.Endian;
 import haxe.io.Bytes;
 import haxe.io.BytesData;
+import openfl.display.Bitmap;
+import openfl.display.BitmapData;
+import openfl.display.PixelSnapping;
+import openfl.events.Event;
+import openfl.events.SampleDataEvent;
+import openfl.media.Sound;
+import openfl.media.SoundChannel;
+import openfl.utils.ByteArray;
+import openfl.utils.Endian;
 
 using Std;
 
@@ -25,6 +26,7 @@ class WebmPlayer extends Bitmap
 	var vpxDecoder:VpxDecoder;
 	var webmDecoder:Dynamic;
 	var outputSound:ByteArray;
+	var soundChannel:SoundChannel;
 	var sound:Sound;
 	
 	var startTime = 0.0;
@@ -61,7 +63,6 @@ class WebmPlayer extends Bitmap
 		
 		sound = new Sound();
 		sound.addEventListener(SampleDataEvent.SAMPLE_DATA, generateSound);
-		sound.play();
 	}
 
 	public function generateSound(e:SampleDataEvent)
@@ -104,6 +105,8 @@ class WebmPlayer extends Bitmap
 		{
 			startTime = haxe.Timer.stamp();
 
+			soundChannel = sound.play();
+		
 			addEventListener(Event.ENTER_FRAME, onSpriteEnterFrame);
 			playing = true;
 			dispatchEvent(new Event('play'));
@@ -114,9 +117,9 @@ class WebmPlayer extends Bitmap
 	{
 		if (playing)
 		{
-			removeEventListener(Event.ENTER_FRAME, onSpriteEnterFrame);
 			playing = false;
 			dispatchEvent(new Event('stop'));
+			dispose();
 		}
 	}
 	
@@ -151,6 +154,29 @@ class WebmPlayer extends Bitmap
 		outputSound.position = outputSound.length;
 		outputSound.writeBytes(ByteArray.fromBytes(Bytes.ofData(data)));
 		outputSound.position = 0;
+	}
+	
+	function dispose()
+	{
+		removeEventListener(Event.ENTER_FRAME, onSpriteEnterFrame);
+		
+		if (sound != null)
+		{
+			sound.removeEventListener(SampleDataEvent.SAMPLE_DATA, generateSound);
+			sound = null;
+		}
+		
+		if (soundChannel != null)
+		{
+			soundChannel.stop();
+			soundChannel = null;
+		}
+		
+		if (bitmapData != null)
+		{
+			bitmapData.dispose();
+			bitmapData = null;
+		}
 	}
 	
 	static var hx_webm_decoder_create:Dynamic -> Dynamic = Lib.load("openfl-webm", "hx_webm_decoder_create", 1);
