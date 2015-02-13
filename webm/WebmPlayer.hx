@@ -178,8 +178,8 @@ class WebmPlayer extends Bitmap
 		}
 	}
 	
-	static var hx_webm_decoder_create:Dynamic -> Dynamic = Lib.load("openfl-webm", "hx_webm_decoder_create", 1);
-	static var hx_webm_decoder_get_info:Dynamic -> Array<Float> = Lib.load("openfl-webm", "hx_webm_decoder_get_info", 1);
-	static var hx_webm_decoder_has_more:Dynamic -> Bool = Lib.load("openfl-webm", "hx_webm_decoder_has_more", 1);
-	static var hx_webm_decoder_step = Lib.load("openfl-webm", "hx_webm_decoder_step", 3);
+	static var hx_webm_decoder_create:Dynamic -> Dynamic = Lib.load("webm", "hx_webm_decoder_create", 1);
+	static var hx_webm_decoder_get_info:Dynamic -> Array<Float> = Lib.load("webm", "hx_webm_decoder_get_info", 1);
+	static var hx_webm_decoder_has_more:Dynamic -> Bool = Lib.load("webm", "hx_webm_decoder_has_more", 1);
+	static var hx_webm_decoder_step = Lib.load("webm", "hx_webm_decoder_step", 3);
 }
