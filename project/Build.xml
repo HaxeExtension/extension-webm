@@ -149,7 +149,7 @@
 <file name="libvpx-generic/vpx_config.c" />
 </files>
 	
-<target id="NDLL" output="${name_prefix}openfl-webm${name_extra}" tool="linker" toolid="${ndll-tool}">
+<target id="NDLL" output="${name_prefix}webm${name_extra}" tool="linker" toolid="${ndll-tool}">
 	<outdir name="../ndll/${BINDIR}" />
 	<ext value=".ndll" unless="mobile"/>
 	<files id="common" />	
