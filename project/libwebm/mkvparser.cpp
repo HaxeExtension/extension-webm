@@ -314,10 +314,10 @@ long mkvparser::ParseElementHeader(IMkvReader* pReader, long long& pos,
     return E_FILE_FORMAT_INVALID;
   }
 
-  // Avoid rolling over pos when very close to LONG_LONG_MAX.
+  // Avoid rolling over pos when very close to LLONG_MAX.
   const unsigned long long rollover_check =
       static_cast<unsigned long long>(pos) + len;
-  if (rollover_check > LONG_LONG_MAX)
+  if (rollover_check > LLONG_MAX)
     return E_FILE_FORMAT_INVALID;
 
   pos += len;  // consume length of size
@@ -423,13 +423,13 @@ bool mkvparser::Match(IMkvReader* pReader, long long& pos,
 
   unsigned long long rollover_check =
       static_cast<unsigned long long>(pos) + len;
-  if (rollover_check > LONG_LONG_MAX)
+  if (rollover_check > LLONG_MAX)
     return false;
 
   pos += len;  // consume length of size of payload
 
   rollover_check = static_cast<unsigned long long>(pos) + size;
-  if (rollover_check > LONG_LONG_MAX)
+  if (rollover_check > LLONG_MAX)
     return false;
 
   assert((pos + size) <= available);
@@ -829,9 +829,9 @@ long long Segment::ParseHeaders() {
     long long pos = m_pos;
     const long long element_start = pos;
 
-    // Avoid rolling over pos when very close to LONG_LONG_MAX.
+    // Avoid rolling over pos when very close to LLONG_MAX.
     unsigned long long rollover_check = pos + 1ULL;
-    if (rollover_check > LONG_LONG_MAX)
+    if (rollover_check > LLONG_MAX)
       return E_FILE_FORMAT_INVALID;
 
     if ((pos + 1) > available)
@@ -900,9 +900,9 @@ long long Segment::ParseHeaders() {
 
     pos += len;  // consume length of size of element
 
-    // Avoid rolling over pos when very close to LONG_LONG_MAX.
+    // Avoid rolling over pos when very close to LLONG_MAX.
     rollover_check = static_cast<unsigned long long>(pos) + size;
-    if (rollover_check > LONG_LONG_MAX)
+    if (rollover_check > LLONG_MAX)
       return E_FILE_FORMAT_INVALID;
 
     const long long element_size = size + pos - element_start;
