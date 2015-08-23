@@ -24,8 +24,8 @@ pushd ../project/libogg
 #cp ./libwebm.a ../../libs/Windows/webm.lib && \
 
 # LIBVPX
-cd ../libvpx && \
-./configure --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder && \
+cd ../libvpx-generic && \
+./configure --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder --disable-vp9-encoder --disable-vp9-decoder && \
 make clean && \
 make && \
 #sudo make install && \
