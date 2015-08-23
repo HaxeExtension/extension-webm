@@ -8,10 +8,10 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef LIBVPX_TEST_ACM_RANDOM_H_
-#define LIBVPX_TEST_ACM_RANDOM_H_
+#ifndef TEST_ACM_RANDOM_H_
+#define TEST_ACM_RANDOM_H_
 
-#include <stdlib.h>
+#include "third_party/googletest/src/include/gtest/gtest.h"
 
 #include "vpx/vpx_integer.h"
 
@@ -19,24 +19,35 @@ namespace libvpx_test {
 
 class ACMRandom {
  public:
-  ACMRandom() {
-    Reset(DeterministicSeed());
-  }
+  ACMRandom() : random_(DeterministicSeed()) {}
 
-  explicit ACMRandom(int seed) {
-    Reset(seed);
-  }
+  explicit ACMRandom(int seed) : random_(seed) {}
 
   void Reset(int seed) {
-    srand(seed);
+    random_.Reseed(seed);
+  }
+  uint16_t Rand16(void) {
+    const uint32_t value =
+        random_.Generate(testing::internal::Random::kMaxRange);
+    return (value >> 15) & 0xffff;
   }
 
   uint8_t Rand8(void) {
-    return (rand() >> 8) & 0xff;
+    const uint32_t value =
+        random_.Generate(testing::internal::Random::kMaxRange);
+    // There's a bit more entropy in the upper bits of this implementation.
+    return (value >> 23) & 0xff;
+  }
+
+  uint8_t Rand8Extremes(void) {
+    // Returns a random value near 0 or near 255, to better exercise
+    // saturation behavior.
+    const uint8_t r = Rand8();
+    return r < 128 ? r << 4 : r >> 4;
   }
 
   int PseudoUniform(int range) {
-    return (rand() >> 8) % range;
+    return random_.Generate(range);
   }
 
   int operator()(int n) {
@@ -46,8 +57,11 @@ class ACMRandom {
   static int DeterministicSeed(void) {
     return 0xbaba;
   }
+
+ private:
+  testing::internal::Random random_;
 };
 
 }  // namespace libvpx_test
 
-#endif  // LIBVPX_TEST_ACM_RANDOM_H_
+#endif  // TEST_ACM_RANDOM_H_

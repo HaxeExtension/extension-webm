@@ -10,8 +10,9 @@
 
 
 #include "vpx_config.h"
-#include "vpx_rtcd.h"
-#include "quantize.h"
+#include "vp8_rtcd.h"
+#include "./vpx_dsp_rtcd.h"
+#include "vp8/encoder/quantize.h"
 #include "vp8/common/reconintra4x4.h"
 #include "encodemb.h"
 #include "vp8/common/invtrans.h"
@@ -44,7 +45,7 @@ int vp8_encode_intra(VP8_COMP *cpi, MACROBLOCK *x, int use_dc_pred)
         }
     }
 
-    intra_pred_var = vp8_get_mb_ss(x->src_diff);
+    intra_pred_var = vpx_get_mb_ss(x->src_diff);
 
     return intra_pred_var;
 }

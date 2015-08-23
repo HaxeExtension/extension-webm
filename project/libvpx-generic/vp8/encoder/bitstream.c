@@ -18,7 +18,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <limits.h>
-#include "vp8/common/pragmas.h"
 #include "vpx/vpx_encoder.h"
 #include "vpx_mem/vpx_mem.h"
 #include "bitstream.h"
@@ -50,7 +49,7 @@ const int vp8cx_base_skip_false_prob[128] =
 unsigned __int64 Sectionbits[500];
 #endif
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
 int intra_mode_stats[10][10][10];
 static unsigned int tree_update_hist [BLOCK_TYPES] [COEF_BANDS] [PREV_COEF_CONTEXTS] [ENTROPY_NODES] [2];
 extern unsigned int active_section;
@@ -90,17 +89,17 @@ static void update_mode(
 
     if (new_b + (n << 8) < old_b)
     {
-        int i = 0;
+        int j = 0;
 
         vp8_write_bit(w, 1);
 
         do
         {
-            const vp8_prob p = Pnew[i];
+            const vp8_prob p = Pnew[j];
 
-            vp8_write_literal(w, Pcur[i] = p ? p : 1, 8);
+            vp8_write_literal(w, Pcur[j] = p ? p : 1, 8);
         }
-        while (++i < n);
+        while (++j < n);
     }
     else
         vp8_write_bit(w, 0);
@@ -118,7 +117,7 @@ static void update_mbintra_mode_probs(VP8_COMP *cpi)
 
         update_mode(
             w, VP8_YMODES, vp8_ymode_encodings, vp8_ymode_tree,
-            Pnew, x->fc.ymode_prob, bct, (unsigned int *)cpi->ymode_count
+            Pnew, x->fc.ymode_prob, bct, (unsigned int *)cpi->mb.ymode_count
         );
     }
     {
@@ -127,7 +126,7 @@ static void update_mbintra_mode_probs(VP8_COMP *cpi)
 
         update_mode(
             w, VP8_UV_MODES, vp8_uv_mode_encodings, vp8_uv_mode_tree,
-            Pnew, x->fc.uv_mode_prob, bct, (unsigned int *)cpi->uv_mode_count
+            Pnew, x->fc.uv_mode_prob, bct, (unsigned int *)cpi->mb.uv_mode_count
         );
     }
 }
@@ -160,7 +159,7 @@ static void write_split(vp8_writer *bc, int x)
     );
 }
 
-void vp8_pack_tokens_c(vp8_writer *w, const TOKENEXTRA *p, int xcount)
+void vp8_pack_tokens(vp8_writer *w, const TOKENEXTRA *p, int xcount)
 {
     const TOKENEXTRA *stop = p + xcount;
     unsigned int split;
@@ -245,15 +244,15 @@ void vp8_pack_tokens_c(vp8_writer *w, const TOKENEXTRA *p, int xcount)
 
             if (L)
             {
-                const unsigned char *pp = b->prob;
-                int v = e >> 1;
-                int n = L;              /* number of bits in v, assumed nonzero */
-                int i = 0;
+                const unsigned char *proba = b->prob;
+                const int v2 = e >> 1;
+                int n2 = L;              /* number of bits in v2, assumed nonzero */
+                i = 0;
 
                 do
                 {
-                    const int bb = (v >> --n) & 1;
-                    split = 1 + (((range - 1) * pp[i>>1]) >> 8);
+                    const int bb = (v2 >> --n2) & 1;
+                    split = 1 + (((range - 1) * proba[i>>1]) >> 8);
                     i = b->tree[i+bb];
 
                     if (bb)
@@ -301,7 +300,7 @@ void vp8_pack_tokens_c(vp8_writer *w, const TOKENEXTRA *p, int xcount)
 
                     lowvalue <<= shift;
                 }
-                while (n);
+                while (n2);
             }
 
 
@@ -375,7 +374,7 @@ static void write_partition_size(unsigned char *cx_data, int size)
 
 }
 
-static void pack_tokens_into_partitions_c(VP8_COMP *cpi, unsigned char *cx_data,
+static void pack_tokens_into_partitions(VP8_COMP *cpi, unsigned char *cx_data,
                                           unsigned char * cx_data_end,
                                           int num_part)
 {
@@ -399,7 +398,7 @@ static void pack_tokens_into_partitions_c(VP8_COMP *cpi, unsigned char *cx_data,
             const TOKENEXTRA *stop = cpi->tplist[mb_row].stop;
             int tokens = (int)(stop - p);
 
-            vp8_pack_tokens_c(w, p, tokens);
+            vp8_pack_tokens(w, p, tokens);
         }
 
         vp8_stop_encode(w);
@@ -408,7 +407,7 @@ static void pack_tokens_into_partitions_c(VP8_COMP *cpi, unsigned char *cx_data,
 }
 
 
-static void pack_mb_row_tokens_c(VP8_COMP *cpi, vp8_writer *w)
+static void pack_mb_row_tokens(VP8_COMP *cpi, vp8_writer *w)
 {
     int mb_row;
 
@@ -418,7 +417,7 @@ static void pack_mb_row_tokens_c(VP8_COMP *cpi, vp8_writer *w)
         const TOKENEXTRA *stop = cpi->tplist[mb_row].stop;
         int tokens = (int)(stop - p);
 
-        vp8_pack_tokens_c(w, p, tokens);
+        vp8_pack_tokens(w, p, tokens);
     }
 
 }
@@ -432,7 +431,7 @@ static void write_mv_ref
     assert(NEARESTMV <= m  &&  m <= SPLITMV);
 #endif
     vp8_write_token(w, vp8_mv_ref_tree, p,
-                    vp8_mv_ref_encoding_array - NEARESTMV + m);
+                    vp8_mv_ref_encoding_array + (m - NEARESTMV));
 }
 
 static void write_sub_mv_ref
@@ -444,7 +443,7 @@ static void write_sub_mv_ref
     assert(LEFT4X4 <= m  &&  m <= NEW4X4);
 #endif
     vp8_write_token(w, vp8_sub_mv_ref_tree, p,
-                    vp8_sub_mv_ref_encoding_array - LEFT4X4 + m);
+                    vp8_sub_mv_ref_encoding_array + (m - LEFT4X4));
 }
 
 static void write_mv
@@ -493,7 +492,7 @@ static void write_mb_features(vp8_writer *w, const MB_MODE_INFO *mi, const MACRO
 }
 void vp8_convert_rfct_to_prob(VP8_COMP *const cpi)
 {
-    const int *const rfct = cpi->count_mb_ref_frame_usage;
+    const int *const rfct = cpi->mb.count_mb_ref_frame_usage;
     const int rf_intra = rfct[INTRA_FRAME];
     const int rf_inter = rfct[LAST_FRAME] + rfct[GOLDEN_FRAME] + rfct[ALTREF_FRAME];
 
@@ -531,7 +530,7 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
 
     vp8_convert_rfct_to_prob(cpi);
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
     active_section = 1;
 #endif
 
@@ -539,7 +538,7 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
     {
         int total_mbs = pc->mb_rows * pc->mb_cols;
 
-        prob_skip_false = (total_mbs - cpi->skip_true_count ) * 256 / total_mbs;
+        prob_skip_false = (total_mbs - cpi->mb.skip_true_count ) * 256 / total_mbs;
 
         if (prob_skip_false <= 1)
             prob_skip_false = 1;
@@ -577,10 +576,10 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
              */
             xd->mb_to_left_edge = -((mb_col * 16) << 3);
             xd->mb_to_right_edge = ((pc->mb_cols - 1 - mb_col) * 16) << 3;
-            xd->mb_to_top_edge = -((mb_row * 16)) << 3;
+            xd->mb_to_top_edge = -((mb_row * 16) << 3);
             xd->mb_to_bottom_edge = ((pc->mb_rows - 1 - mb_row) * 16) << 3;
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
             active_section = 9;
 #endif
 
@@ -593,7 +592,7 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
             if (rf == INTRA_FRAME)
             {
                 vp8_write(w, 0, cpi->prob_intra_coded);
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                 active_section = 6;
 #endif
                 write_ymode(w, mode, pc->fc.ymode_prob);
@@ -633,13 +632,13 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
 
                     vp8_mv_ref_probs(mv_ref_p, ct);
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                     accum_mv_refs(mode, ct);
 #endif
 
                 }
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                 active_section = 3;
 #endif
 
@@ -649,7 +648,7 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
                 {
                 case NEWMV:
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                     active_section = 5;
 #endif
 
@@ -692,7 +691,7 @@ static void pack_inter_mode_mvs(VP8_COMP *const cpi)
 
                         if (blockmode == NEW4X4)
                         {
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                             active_section = 11;
 #endif
                             write_mv(w, &blockmv.as_mv, &best_mv, (const MV_CONTEXT *) mvc);
@@ -730,7 +729,7 @@ static void write_kfmodes(VP8_COMP *cpi)
     {
         int total_mbs = c->mb_rows * c->mb_cols;
 
-        prob_skip_false = (total_mbs - cpi->skip_true_count ) * 256 / total_mbs;
+        prob_skip_false = (total_mbs - cpi->mb.skip_true_count ) * 256 / total_mbs;
 
         if (prob_skip_false <= 1)
             prob_skip_false = 1;
@@ -769,7 +768,7 @@ static void write_kfmodes(VP8_COMP *cpi)
                     const B_PREDICTION_MODE L = left_block_mode(m, i);
                     const int bm = m->bmi[i].as_mode;
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                     ++intra_mode_stats [A] [L] [bm];
 #endif
 
@@ -851,6 +850,7 @@ static int prob_update_savings(const unsigned int *ct,
 
 static int independent_coef_context_savings(VP8_COMP *cpi)
 {
+    MACROBLOCK *const x = & cpi->mb;
     int savings = 0;
     int i = 0;
     do
@@ -867,7 +867,7 @@ static int independent_coef_context_savings(VP8_COMP *cpi)
              */
 
             probs = (const unsigned int (*)[MAX_ENTROPY_TOKENS])
-                                                    cpi->coef_counts[i][j];
+                x->coef_counts[i][j];
 
             /* Reset to default probabilities at key frames */
             if (cpi->common.frame_type == KEY_FRAME)
@@ -926,6 +926,7 @@ static int independent_coef_context_savings(VP8_COMP *cpi)
 
 static int default_coef_context_savings(VP8_COMP *cpi)
 {
+    MACROBLOCK *const x = & cpi->mb;
     int savings = 0;
     int i = 0;
     do
@@ -945,7 +946,7 @@ static int default_coef_context_savings(VP8_COMP *cpi)
                     MAX_ENTROPY_TOKENS, vp8_coef_encodings, vp8_coef_tree,
                     cpi->frame_coef_probs [i][j][k],
                     cpi->frame_branch_ct [i][j][k],
-                    cpi->coef_counts [i][j][k],
+                    x->coef_counts [i][j][k],
                     256, 1
                 );
 
@@ -978,6 +979,12 @@ void vp8_calc_ref_frame_costs(int *ref_frame_cost,
                               int prob_garf
                              )
 {
+    assert(prob_intra >= 0);
+    assert(prob_intra <= 255);
+    assert(prob_last >= 0);
+    assert(prob_last <= 255);
+    assert(prob_garf >= 0);
+    assert(prob_garf <= 255);
     ref_frame_cost[INTRA_FRAME]   = vp8_cost_zero(prob_intra);
     ref_frame_cost[LAST_FRAME]    = vp8_cost_one(prob_intra)
                                     + vp8_cost_zero(prob_last);
@@ -994,7 +1001,7 @@ int vp8_estimate_entropy_savings(VP8_COMP *cpi)
 {
     int savings = 0;
 
-    const int *const rfct = cpi->count_mb_ref_frame_usage;
+    const int *const rfct = cpi->mb.count_mb_ref_frame_usage;
     const int rf_intra = rfct[INTRA_FRAME];
     const int rf_inter = rfct[LAST_FRAME] + rfct[GOLDEN_FRAME] + rfct[ALTREF_FRAME];
     int new_intra, new_last, new_garf, oldtotal, newtotal;
@@ -1054,7 +1061,7 @@ int vp8_update_coef_context(VP8_COMP *cpi)
     if (cpi->common.frame_type == KEY_FRAME)
     {
         /* Reset to default counts/probabilities at key frames */
-        vp8_copy(cpi->coef_counts, default_coef_counts);
+        vp8_copy(cpi->mb.coef_counts, default_coef_counts);
     }
 
     if (cpi->oxcf.error_resilient_mode & VPX_ERROR_RESILIENT_PARTITIONS)
@@ -1152,7 +1159,7 @@ void vp8_update_coef_probs(VP8_COMP *cpi)
 #endif
 
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                     ++ tree_update_hist [i][j][k][t] [u];
 #endif
 
@@ -1173,7 +1180,7 @@ void vp8_update_coef_probs(VP8_COMP *cpi)
                 while (++t < ENTROPY_NODES);
 
                 /* Accum token counts for generation of default statistics */
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
                 t = 0;
 
                 do
@@ -1314,7 +1321,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
         vp8_start_encode(bc, cx_data, cx_data_end);
 
         /* signal clr type */
-        vp8_write_bit(bc, pc->clr_type);
+        vp8_write_bit(bc, 0);
         vp8_write_bit(bc, pc->clamp_type);
 
     }
@@ -1519,7 +1526,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
     if (pc->frame_type != KEY_FRAME)
         vp8_write_bit(bc, pc->refresh_last_frame);
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
 
     if (pc->frame_type == INTER_FRAME)
         active_section = 0;
@@ -1536,13 +1543,13 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
     if (pc->refresh_entropy_probs == 0)
     {
         /* save a copy for later refresh */
-        vpx_memcpy(&cpi->common.lfc, &cpi->common.fc, sizeof(cpi->common.fc));
+        memcpy(&cpi->common.lfc, &cpi->common.fc, sizeof(cpi->common.fc));
     }
 
     vp8_update_coef_probs(cpi);
 #endif
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
     active_section = 2;
 #endif
 
@@ -1553,7 +1560,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
     {
         write_kfmodes(cpi);
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
         active_section = 8;
 #endif
     }
@@ -1561,7 +1568,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
     {
         pack_inter_mode_mvs(cpi);
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
         active_section = 1;
 #endif
     }
@@ -1613,7 +1620,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
             /* concatenate partition buffers */
             for(i = 0; i < num_part; i++)
             {
-                vpx_memmove(dp, cpi->partition_d[i+1], cpi->partition_sz[i+1]);
+                memmove(dp, cpi->partition_d[i+1], cpi->partition_sz[i+1]);
                 cpi->partition_d[i+1] = dp;
                 dp += cpi->partition_sz[i+1];
             }
@@ -1669,7 +1676,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
             pack_mb_row_tokens(cpi, &cpi->bc[1]);
         else
 #endif
-            pack_tokens(&cpi->bc[1], cpi->tok, cpi->tok_count);
+            vp8_pack_tokens(&cpi->bc[1], cpi->tok, cpi->tok_count);
 
         vp8_stop_encode(&cpi->bc[1]);
 
@@ -1679,7 +1686,7 @@ void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char * dest
 #endif
 }
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
 void print_tree_update_probs()
 {
     int i, j, k, l;

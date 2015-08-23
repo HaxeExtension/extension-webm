@@ -9,26 +9,27 @@
  */
 #include <climits>
 #include <vector>
+#include "third_party/googletest/src/include/gtest/gtest.h"
+#include "test/codec_factory.h"
 #include "test/encode_test_driver.h"
 #include "test/i420_video_source.h"
-#include "third_party/googletest/src/include/gtest/gtest.h"
+#include "test/util.h"
 
 namespace {
 
 class KeyframeTest : public ::libvpx_test::EncoderTest,
-    public ::testing::TestWithParam<enum libvpx_test::TestMode> {
+    public ::libvpx_test::CodecTestWithParam<libvpx_test::TestMode> {
  protected:
+  KeyframeTest() : EncoderTest(GET_PARAM(0)) {}
+  virtual ~KeyframeTest() {}
+
   virtual void SetUp() {
     InitializeConfig();
-    SetMode(GetParam());
+    SetMode(GET_PARAM(1));
     kf_count_ = 0;
     kf_count_max_ = INT_MAX;
     kf_do_force_kf_ = false;
     set_cpu_used_ = 0;
-  }
-
-  virtual bool Continue() const {
-    return !HasFatalFailure() && !abort_;
   }
 
   virtual void PreEncodeFrameHook(::libvpx_test::VideoSource *video,
@@ -64,7 +65,7 @@ TEST_P(KeyframeTest, TestRandomVideoSource) {
 
   // In realtime mode - auto placed keyframes are exceedingly rare,  don't
   // bother with this check   if(GetParam() > 0)
-  if(GetParam() > 0)
+  if (GET_PARAM(1) > 0)
     EXPECT_GT(kf_count_, 1);
 }
 
@@ -126,13 +127,12 @@ TEST_P(KeyframeTest, TestAutoKeyframe) {
 
   // In realtime mode - auto placed keyframes are exceedingly rare,  don't
   // bother with this check
-  if(GetParam() > 0)
+  if (GET_PARAM(1) > 0)
     EXPECT_EQ(2u, kf_pts_list_.size()) << " Not the right number of keyframes ";
 
   // Verify that keyframes match the file keyframes in the file.
   for (std::vector<vpx_codec_pts_t>::const_iterator iter = kf_pts_list_.begin();
        iter != kf_pts_list_.end(); ++iter) {
-
     if (deadline_ == VPX_DL_REALTIME && *iter > 0)
       EXPECT_EQ(0, (*iter - 1) % 30) << "Unexpected keyframe at frame "
         << *iter;
@@ -141,5 +141,5 @@ TEST_P(KeyframeTest, TestAutoKeyframe) {
   }
 }
 
-INSTANTIATE_TEST_CASE_P(AllModes, KeyframeTest, ALL_TEST_MODES);
+VP8_INSTANTIATE_TEST_CASE(KeyframeTest, ALL_TEST_MODES);
 }  // namespace

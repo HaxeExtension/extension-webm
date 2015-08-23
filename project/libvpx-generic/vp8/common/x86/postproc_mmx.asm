@@ -61,7 +61,7 @@ sym(vp8_mbpost_proc_down_mmx):
             mov         rcx,        8
 .init_borderd                                                    ; initialize borders
             lea         rdi,        [rdi + rax]
-            movq        [rdi],      xmm1
+            movq        [rdi],      mm1
 
             dec         rcx
             jne         .init_borderd
@@ -193,7 +193,6 @@ sym(vp8_mbpost_proc_down_mmx):
             movq        mm4,        [sym(vp8_rv) + rcx*2]
 %endif
             paddw       mm1,        mm4
-            ;paddw     xmm1,       eight8s
             psraw       mm1,        4
 
             packuswb    mm1,        mm0
@@ -205,13 +204,16 @@ sym(vp8_mbpost_proc_down_mmx):
             and         rcx,        15
             movd        DWORD PTR   [rsp+rcx*4], mm1 ;d[rcx*4]
 
+            cmp         edx,        8
+            jl          .skip_assignment
+
             mov         rcx,        rdx
             sub         rcx,        8
-
             and         rcx,        15
             movd        mm1,        DWORD PTR [rsp+rcx*4] ;d[rcx*4]
-
             movd        [rsi],      mm1
+
+.skip_assignment
             lea         rsi,        [rsi+rax]
 
             lea         rdi,        [rdi+rax]
@@ -244,7 +246,6 @@ sym(vp8_mbpost_proc_down_mmx):
 ;                            unsigned char whiteclamp[16],
 ;                            unsigned char bothclamp[16],
 ;                            unsigned int Width, unsigned int Height, int Pitch)
-extern sym(rand)
 global sym(vp8_plane_add_noise_mmx) PRIVATE
 sym(vp8_plane_add_noise_mmx):
     push        rbp
@@ -256,7 +257,7 @@ sym(vp8_plane_add_noise_mmx):
     ; end prolog
 
 .addnoise_loop:
-    call sym(rand) WRT_PLT
+    call sym(LIBVPX_RAND) WRT_PLT
     mov     rcx, arg(1) ;noise
     and     rax, 0xff
     add     rcx, rax

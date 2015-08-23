@@ -10,11 +10,12 @@
 
 
 #include "vpx_config.h"
-#include "vpx_rtcd.h"
+#include "vp8_rtcd.h"
+#include "vpx_scale_rtcd.h"
 #include "vpx_scale/yv12config.h"
 #include "postproc.h"
 #include "common.h"
-#include "vpx_scale/vpxscale.h"
+#include "vpx_scale/vpx_scale.h"
 #include "systemdependent.h"
 
 #include <limits.h>
@@ -69,11 +70,6 @@ static const unsigned char MV_REFERENCE_FRAME_colors[MAX_REF_FRAMES][3] =
     { RGB_TO_YUV(0xff0000) },   /* Red */
 };
 #endif
-
-static const short kernel5[] =
-{
-    1, 1, 4, 1, 1
-};
 
 const short vp8_rv[] =
 {
@@ -218,6 +214,7 @@ static int q2mbl(int x)
     x = 50 + (x - 50) * 10 / 8;
     return x * x / 3;
 }
+
 void vp8_mbpost_proc_across_ip_c(unsigned char *src, int pitch, int rows, int cols, int flimit)
 {
     int r, c, i;
@@ -230,14 +227,14 @@ void vp8_mbpost_proc_across_ip_c(unsigned char *src, int pitch, int rows, int co
         int sumsq = 0;
         int sum   = 0;
 
-        for (i = -8; i<0; i++)
+        for (i = -8; i < 0; i++)
           s[i]=s[0];
 
         /* 17 avoids valgrind warning - we buffer values in c in d
          * and only write them when we've read 8 ahead...
          */
-        for (i = cols; i<cols+17; i++)
-          s[i]=s[cols-1];
+        for (i = 0; i < 17; i++)
+          s[i+cols]=s[cols-1];
 
         for (i = -8; i <= 6; i++)
         {
@@ -268,7 +265,6 @@ void vp8_mbpost_proc_across_ip_c(unsigned char *src, int pitch, int rows, int co
     }
 }
 
-
 void vp8_mbpost_proc_down_c(unsigned char *dst, int pitch, int rows, int cols, int flimit)
 {
     int r, c, i;
@@ -288,8 +284,8 @@ void vp8_mbpost_proc_down_c(unsigned char *dst, int pitch, int rows, int cols, i
         /* 17 avoids valgrind warning - we buffer values in c in d
          * and only write them when we've read 8 ahead...
          */
-        for (i = rows; i < rows+17; i++)
-          s[i*pitch]=s[(rows-1)*pitch];
+        for (i = 0; i < 17; i++)
+          s[(i+rows)*pitch]=s[(rows-1)*pitch];
 
         for (i = -8; i <= 6; i++)
         {
@@ -307,13 +303,14 @@ void vp8_mbpost_proc_down_c(unsigned char *dst, int pitch, int rows, int cols, i
             {
                 d[r&15] = (rv2[r&127] + sum + s[0]) >> 4;
             }
-
-            s[-8*pitch] = d[(r-8)&15];
+            if (r >= 8)
+              s[-8*pitch] = d[(r-8)&15];
             s += pitch;
         }
     }
 }
 
+#if CONFIG_POSTPROC
 static void vp8_de_mblock(YV12_BUFFER_CONFIG         *post,
                           int                         q)
 {
@@ -333,7 +330,7 @@ void vp8_deblock(VP8_COMMON                 *cm,
     double level = 6.0e-05 * q * q * q - .0067 * q * q + .306 * q + .0065;
     int ppl = (int)(level + .5);
 
-    const MODE_INFO *mode_info_context = cm->mi;
+    const MODE_INFO *mode_info_context = cm->show_frame_mi;
     int mbr, mbc;
 
     /* The pixel thresholds are adjusted according to if or not the macroblock
@@ -358,8 +355,8 @@ void vp8_deblock(VP8_COMMON                 *cm,
                 else
                     mb_ppl = (unsigned char)ppl;
 
-                vpx_memset(ylptr, mb_ppl, 16);
-                vpx_memset(uvlptr, mb_ppl, 8);
+                memset(ylptr, mb_ppl, 16);
+                memset(uvlptr, mb_ppl, 8);
 
                 ylptr += 16;
                 uvlptr += 8;
@@ -386,26 +383,27 @@ void vp8_deblock(VP8_COMMON                 *cm,
         vp8_yv12_copy_frame(source, post);
     }
 }
+#endif
 
-#if !(CONFIG_TEMPORAL_DENOISING)
 void vp8_de_noise(VP8_COMMON                 *cm,
                   YV12_BUFFER_CONFIG         *source,
                   YV12_BUFFER_CONFIG         *post,
                   int                         q,
                   int                         low_var_thresh,
-                  int                         flag)
+                  int                         flag,
+                  int                         uvfilter)
 {
+    int mbr;
     double level = 6.0e-05 * q * q * q - .0067 * q * q + .306 * q + .0065;
     int ppl = (int)(level + .5);
-    int mb_rows = source->y_width >> 4;
-    int mb_cols = source->y_height >> 4;
+    int mb_rows = cm->mb_rows;
+    int mb_cols = cm->mb_cols;
     unsigned char *limits = cm->pp_limits_buffer;;
-    int mbr, mbc;
     (void) post;
     (void) low_var_thresh;
     (void) flag;
 
-    vpx_memset(limits, (unsigned char)ppl, 16 * mb_cols);
+    memset(limits, (unsigned char)ppl, 16 * mb_cols);
 
     /* TODO: The original code don't filter the 2 outer rows and columns. */
     for (mbr = 0; mbr < mb_rows; mbr++)
@@ -414,20 +412,22 @@ void vp8_de_noise(VP8_COMMON                 *cm,
             source->y_buffer + 16 * mbr * source->y_stride,
             source->y_buffer + 16 * mbr * source->y_stride,
             source->y_stride, source->y_stride, source->y_width, limits, 16);
-
-        vp8_post_proc_down_and_across_mb_row(
-            source->u_buffer + 8 * mbr * source->uv_stride,
-            source->u_buffer + 8 * mbr * source->uv_stride,
-            source->uv_stride, source->uv_stride, source->uv_width, limits, 8);
-        vp8_post_proc_down_and_across_mb_row(
-            source->v_buffer + 8 * mbr * source->uv_stride,
-            source->v_buffer + 8 * mbr * source->uv_stride,
-            source->uv_stride, source->uv_stride, source->uv_width, limits, 8);
+        if (uvfilter == 1) {
+          vp8_post_proc_down_and_across_mb_row(
+              source->u_buffer + 8 * mbr * source->uv_stride,
+              source->u_buffer + 8 * mbr * source->uv_stride,
+              source->uv_stride, source->uv_stride, source->uv_width, limits,
+              8);
+          vp8_post_proc_down_and_across_mb_row(
+              source->v_buffer + 8 * mbr * source->uv_stride,
+              source->v_buffer + 8 * mbr * source->uv_stride,
+              source->uv_stride, source->uv_stride, source->uv_width, limits,
+              8);
+        }
     }
 }
-#endif
 
-double vp8_gaussian(double sigma, double mu, double x)
+static double gaussian(double sigma, double mu, double x)
 {
     return 1 / (sigma * sqrt(2.0 * 3.14159265)) *
            (exp(-(x - mu) * (x - mu) / (2 * sigma * sigma)));
@@ -438,29 +438,28 @@ static void fillrd(struct postproc_state *state, int q, int a)
     char char_dist[300];
 
     double sigma;
-    int ai = a, qi = q, i;
+    int i;
 
     vp8_clear_system_state();
 
 
-    sigma = ai + .5 + .6 * (63 - qi) / 63.0;
+    sigma = a + .5 + .6 * (63 - q) / 63.0;
 
     /* set up a lookup table of 256 entries that matches
      * a gaussian distribution with sigma determined by q.
      */
     {
-        double i;
         int next, j;
 
         next = 0;
 
         for (i = -32; i < 32; i++)
         {
-            int a = (int)(.5 + 256 * vp8_gaussian(sigma, 0, i));
+            const int v = (int)(.5 + 256 * gaussian(sigma, 0, i));
 
-            if (a)
+            if (v)
             {
-                for (j = 0; j < a; j++)
+                for (j = 0; j < v; j++)
                 {
                     char_dist[next+j] = (char) i;
                 }
@@ -519,6 +518,7 @@ void vp8_plane_add_noise_c(unsigned char *Start, char *noise,
                            unsigned int Width, unsigned int Height, int Pitch)
 {
     unsigned int i, j;
+    (void)bothclamp;
 
     for (i = 0; i < Height; i++)
     {
@@ -543,12 +543,12 @@ void vp8_plane_add_noise_c(unsigned char *Start, char *noise,
  * filled with the same color block.
  */
 void vp8_blend_mb_inner_c (unsigned char *y, unsigned char *u, unsigned char *v,
-                        int y1, int u1, int v1, int alpha, int stride)
+                        int y_1, int u_1, int v_1, int alpha, int stride)
 {
     int i, j;
-    int y1_const = y1*((1<<16)-alpha);
-    int u1_const = u1*((1<<16)-alpha);
-    int v1_const = v1*((1<<16)-alpha);
+    int y1_const = y_1*((1<<16)-alpha);
+    int u1_const = u_1*((1<<16)-alpha);
+    int v1_const = v_1*((1<<16)-alpha);
 
     y += 2*stride + 2;
     for (i = 0; i < 12; i++)
@@ -581,12 +581,12 @@ void vp8_blend_mb_inner_c (unsigned char *y, unsigned char *u, unsigned char *v,
  * unblended to allow for other visualizations to be layered.
  */
 void vp8_blend_mb_outer_c (unsigned char *y, unsigned char *u, unsigned char *v,
-                        int y1, int u1, int v1, int alpha, int stride)
+                        int y_1, int u_1, int v_1, int alpha, int stride)
 {
     int i, j;
-    int y1_const = y1*((1<<16)-alpha);
-    int u1_const = u1*((1<<16)-alpha);
-    int v1_const = v1*((1<<16)-alpha);
+    int y1_const = y_1*((1<<16)-alpha);
+    int u1_const = u_1*((1<<16)-alpha);
+    int v1_const = v_1*((1<<16)-alpha);
 
     for (i = 0; i < 2; i++)
     {
@@ -645,12 +645,12 @@ void vp8_blend_mb_outer_c (unsigned char *y, unsigned char *u, unsigned char *v,
 }
 
 void vp8_blend_b_c (unsigned char *y, unsigned char *u, unsigned char *v,
-                        int y1, int u1, int v1, int alpha, int stride)
+                        int y_1, int u_1, int v_1, int alpha, int stride)
 {
     int i, j;
-    int y1_const = y1*((1<<16)-alpha);
-    int u1_const = u1*((1<<16)-alpha);
-    int v1_const = v1*((1<<16)-alpha);
+    int y1_const = y_1*((1<<16)-alpha);
+    int u1_const = u_1*((1<<16)-alpha);
+    int v1_const = v_1*((1<<16)-alpha);
 
     for (i = 0; i < 4; i++)
     {
@@ -675,46 +675,46 @@ void vp8_blend_b_c (unsigned char *y, unsigned char *u, unsigned char *v,
     }
 }
 
-static void constrain_line (int x0, int *x1, int y0, int *y1, int width, int height)
+static void constrain_line (int x_0, int *x_1, int y_0, int *y_1, int width, int height)
 {
     int dx;
     int dy;
 
-    if (*x1 > width)
+    if (*x_1 > width)
     {
-        dx = *x1 - x0;
-        dy = *y1 - y0;
+        dx = *x_1 - x_0;
+        dy = *y_1 - y_0;
 
-        *x1 = width;
+        *x_1 = width;
         if (dx)
-            *y1 = ((width-x0)*dy)/dx + y0;
+            *y_1 = ((width-x_0)*dy)/dx + y_0;
     }
-    if (*x1 < 0)
+    if (*x_1 < 0)
     {
-        dx = *x1 - x0;
-        dy = *y1 - y0;
+        dx = *x_1 - x_0;
+        dy = *y_1 - y_0;
 
-        *x1 = 0;
+        *x_1 = 0;
         if (dx)
-            *y1 = ((0-x0)*dy)/dx + y0;
+            *y_1 = ((0-x_0)*dy)/dx + y_0;
     }
-    if (*y1 > height)
+    if (*y_1 > height)
     {
-        dx = *x1 - x0;
-        dy = *y1 - y0;
+        dx = *x_1 - x_0;
+        dy = *y_1 - y_0;
 
-        *y1 = height;
+        *y_1 = height;
         if (dy)
-            *x1 = ((height-y0)*dx)/dy + x0;
+            *x_1 = ((height-y_0)*dx)/dy + x_0;
     }
-    if (*y1 < 0)
+    if (*y_1 < 0)
     {
-        dx = *x1 - x0;
-        dy = *y1 - y0;
+        dx = *x_1 - x_0;
+        dy = *y_1 - y_0;
 
-        *y1 = 0;
+        *y_1 = 0;
         if (dy)
-            *x1 = ((0-y0)*dx)/dy + x0;
+            *x_1 = ((0-y_0)*dx)/dy + x_0;
     }
 }
 
@@ -763,14 +763,12 @@ int vp8_post_proc_frame(VP8_COMMON *oci, YV12_BUFFER_CONFIG *dest, vp8_ppflags_t
             /* insure that postproc is set to all 0's so that post proc
              * doesn't pull random data in from edge
              */
-            vpx_memset((&oci->post_proc_buffer_int)->buffer_alloc,128,(&oci->post_proc_buffer)->frame_size);
+            memset((&oci->post_proc_buffer_int)->buffer_alloc,128,(&oci->post_proc_buffer)->frame_size);
 
         }
     }
 
-#if ARCH_X86||ARCH_X86_64
-    vpx_reset_mmx_state();
-#endif
+    vp8_clear_system_state();
 
     if ((flags & VP8D_MFQE) &&
          oci->postproc_state.last_frame_valid &&
@@ -925,7 +923,7 @@ int vp8_post_proc_frame(VP8_COMMON *oci, YV12_BUFFER_CONFIG *dest, vp8_ppflags_t
     if (flags & VP8D_DEBUG_TXT_RATE_INFO)
     {
         char message[512];
-        sprintf(message, "Bitrate: %10.2f frame_rate: %10.2f ", oci->bitrate, oci->framerate);
+        sprintf(message, "Bitrate: %10.2f framerate: %10.2f ", oci->bitrate, oci->framerate);
         vp8_blit_text(message, oci->post_proc_buffer.y_buffer, oci->post_proc_buffer.y_stride);
     }
 

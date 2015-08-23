@@ -8,66 +8,95 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#ifndef VPX_SCALE_YV12CONFIG_H_
+#define VPX_SCALE_YV12CONFIG_H_
 
-#ifndef YV12_CONFIG_H
-#define YV12_CONFIG_H
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-#define VP7BORDERINPIXELS       48
-#define VP8BORDERINPIXELS       32
+#include "./vpx_config.h"
+#include "vpx/vpx_codec.h"
+#include "vpx/vpx_frame_buffer.h"
+#include "vpx/vpx_integer.h"
 
-    /*************************************
-     For INT_YUV:
+#define VP8BORDERINPIXELS           32
+#define VP9INNERBORDERINPIXELS      96
+#define VP9_INTERP_EXTEND           4
+#define VP9_ENC_BORDER_IN_PIXELS    160
+#define VP9_DEC_BORDER_IN_PIXELS    32
 
-     Y = (R+G*2+B)/4;
-     U = (R-B)/2;
-     V =  (G*2 - R - B)/4;
-    And
-     R = Y+U-V;
-     G = Y+V;
-     B = Y-U-V;
-    ************************************/
-    typedef enum
-    {
-        REG_YUV = 0,    /* Regular yuv */
-        INT_YUV = 1     /* The type of yuv that can be tranfer to and from RGB through integer transform */
-              }
-              YUV_TYPE;
+typedef struct yv12_buffer_config {
+  int   y_width;
+  int   y_height;
+  int   y_crop_width;
+  int   y_crop_height;
+  int   y_stride;
 
-    typedef struct yv12_buffer_config
-    {
-        int   y_width;
-        int   y_height;
-        int   y_stride;
-/*    int   yinternal_width; */
+  int   uv_width;
+  int   uv_height;
+  int   uv_crop_width;
+  int   uv_crop_height;
+  int   uv_stride;
 
-        int   uv_width;
-        int   uv_height;
-        int   uv_stride;
-/*    int   uvinternal_width; */
+  int   alpha_width;
+  int   alpha_height;
+  int   alpha_stride;
 
-        unsigned char *y_buffer;
-        unsigned char *u_buffer;
-        unsigned char *v_buffer;
+  uint8_t *y_buffer;
+  uint8_t *u_buffer;
+  uint8_t *v_buffer;
+  uint8_t *alpha_buffer;
 
-        unsigned char *buffer_alloc;
-        int border;
-        int frame_size;
-        YUV_TYPE clrtype;
+  uint8_t *buffer_alloc;
+  int buffer_alloc_sz;
+  int border;
+  int frame_size;
+  int subsampling_x;
+  int subsampling_y;
+  unsigned int bit_depth;
+  vpx_color_space_t color_space;
 
-        int corrupted;
-        int flags;
-    } YV12_BUFFER_CONFIG;
+  int corrupted;
+  int flags;
+} YV12_BUFFER_CONFIG;
 
-    int vp8_yv12_alloc_frame_buffer(YV12_BUFFER_CONFIG *ybf, int width, int height, int border);
-    int vp8_yv12_de_alloc_frame_buffer(YV12_BUFFER_CONFIG *ybf);
+#define YV12_FLAG_HIGHBITDEPTH 8
+
+int vp8_yv12_alloc_frame_buffer(YV12_BUFFER_CONFIG *ybf,
+                                int width, int height, int border);
+int vp8_yv12_realloc_frame_buffer(YV12_BUFFER_CONFIG *ybf,
+                                  int width, int height, int border);
+int vp8_yv12_de_alloc_frame_buffer(YV12_BUFFER_CONFIG *ybf);
+
+int vpx_alloc_frame_buffer(YV12_BUFFER_CONFIG *ybf,
+                           int width, int height, int ss_x, int ss_y,
+#if CONFIG_VP9_HIGHBITDEPTH
+                           int use_highbitdepth,
+#endif
+                           int border, int byte_alignment);
+
+// Updates the yv12 buffer config with the frame buffer. |byte_alignment| must
+// be a power of 2, from 32 to 1024. 0 sets legacy alignment. If cb is not
+// NULL, then libvpx is using the frame buffer callbacks to handle memory.
+// If cb is not NULL, libvpx will call cb with minimum size in bytes needed
+// to decode the current frame. If cb is NULL, libvpx will allocate memory
+// internally to decode the current frame. Returns 0 on success. Returns < 0
+// on failure.
+int vpx_realloc_frame_buffer(YV12_BUFFER_CONFIG *ybf,
+                             int width, int height, int ss_x, int ss_y,
+#if CONFIG_VP9_HIGHBITDEPTH
+                             int use_highbitdepth,
+#endif
+                             int border,
+                             int byte_alignment,
+                             vpx_codec_frame_buffer_t *fb,
+                             vpx_get_frame_buffer_cb_fn_t cb,
+                             void *cb_priv);
+int vpx_free_frame_buffer(YV12_BUFFER_CONFIG *ybf);
 
 #ifdef __cplusplus
 }
 #endif
 
-
-#endif /*YV12_CONFIG_H*/
+#endif  // VPX_SCALE_YV12CONFIG_H_

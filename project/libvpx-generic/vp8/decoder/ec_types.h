@@ -8,11 +8,14 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef VP8_DEC_EC_TYPES_H
-#define VP8_DEC_EC_TYPES_H
+#ifndef VP8_DECODER_EC_TYPES_H_
+#define VP8_DECODER_EC_TYPES_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define MAX_OVERLAPS 16
-
 
 
 /* The area (pixel area in Q6) the block pointed to by bmi overlaps
@@ -48,4 +51,8 @@ typedef struct
     MV_REFERENCE_FRAME ref_frame;
 } EC_BLOCK;
 
-#endif /* VP8_DEC_EC_TYPES_H */
+#ifdef __cplusplus
+}  // extern "C"
+#endif
+
+#endif  // VP8_DECODER_EC_TYPES_H_

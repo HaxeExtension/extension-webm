@@ -10,7 +10,7 @@
 
 
 #include "vpx_config.h"
-#include "vpx_rtcd.h"
+#include "vp8_rtcd.h"
 #include "vp8/common/blockd.h"
 #include "vpx_mem/vpx_mem.h"
 
@@ -38,6 +38,6 @@ void vp8_dequant_idct_add_c(short *input, short *dq,
 
     vp8_short_idct4x4llm_c(input, dest, stride, dest, stride);
 
-    vpx_memset(input, 0, 32);
+    memset(input, 0, 32);
 
 }

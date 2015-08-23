@@ -9,11 +9,11 @@
 ##  be found in the AUTHORS file in the root of the source tree.
 ##
 
-
 self=$0
 self_basename=${self##*/}
 self_dirname=$(dirname "$0")
-EOL=$'\n'
+
+. "$self_dirname/msvs_common.sh"|| exit 127
 
 show_help() {
     cat <<EOF
@@ -26,6 +26,7 @@ Options:
     --help                      Print this message
     --exe                       Generate a project for building an Application
     --lib                       Generate a project for creating a static library
+    --dll                       Generate a project for creating a dll
     --static-crt                Use the static C runtime (/MT)
     --target=isa-os-cc          Target specifier (required)
     --out=filename              Write output to a file [stdout]
@@ -40,82 +41,6 @@ Options:
     -llibname                   Library to link against
 EOF
     exit 1
-}
-
-die() {
-    echo "${self_basename}: $@" >&2
-    exit 1
-}
-
-die_unknown(){
-    echo "Unknown option \"$1\"." >&2
-    echo "See ${self_basename} --help for available options." >&2
-    exit 1
-}
-
-generate_uuid() {
-    local hex="0123456789ABCDEF"
-    local i
-    local uuid=""
-    local j
-    #93995380-89BD-4b04-88EB-625FBE52EBFB
-    for ((i=0; i<32; i++)); do
-        (( j = $RANDOM % 16 ))
-        uuid="${uuid}${hex:$j:1}"
-    done
-    echo "${uuid:0:8}-${uuid:8:4}-${uuid:12:4}-${uuid:16:4}-${uuid:20:12}"
-}
-
-indent1="    "
-indent=""
-indent_push() {
-    indent="${indent}${indent1}"
-}
-indent_pop() {
-    indent="${indent%${indent1}}"
-}
-
-tag_attributes() {
-    for opt in "$@"; do
-        optval="${opt#*=}"
-        [ -n "${optval}" ] ||
-            die "Missing attribute value in '$opt' while generating $tag tag"
-        echo "${indent}${opt%%=*}=\"${optval}\""
-    done
-}
-
-open_tag() {
-    local tag=$1
-    shift
-    if [ $# -ne 0 ]; then
-        echo "${indent}<${tag}"
-        indent_push
-        tag_attributes "$@"
-        echo "${indent}>"
-    else
-        echo "${indent}<${tag}>"
-        indent_push
-    fi
-}
-
-close_tag() {
-    local tag=$1
-    indent_pop
-    echo "${indent}</${tag}>"
-}
-
-tag() {
-    local tag=$1
-    shift
-    if [ $# -ne 0 ]; then
-        echo "${indent}<${tag}"
-        indent_push
-        tag_attributes "$@"
-        indent_pop
-        echo "${indent}/>"
-    else
-        echo "${indent}<${tag}/>"
-    fi
 }
 
 generate_filter() {
@@ -142,8 +67,16 @@ generate_filter() {
             if [ "${f##*.}" == "$pat" ]; then
                 unset file_list[i]
 
-                open_tag File RelativePath="./$f"
+                objf=$(echo ${f%.*}.obj \
+                       | sed -e "s,$src_path_bare,," \
+                             -e 's/^[\./]\+//g' -e 's,[:/ ],_,g')
+                open_tag File RelativePath="$f"
+
                 if [ "$pat" == "asm" ] && $asm_use_custom_step; then
+                    # Avoid object file name collisions, i.e. vpx_config.c and
+                    # vpx_config.asm produce the same object file without
+                    # this additional suffix.
+                    objf=${objf%.obj}_asm.obj
                     for plat in "${platforms[@]}"; do
                         for cfg in Debug Release; do
                             open_tag FileConfiguration \
@@ -152,14 +85,28 @@ generate_filter() {
                             tag Tool \
                                 Name="VCCustomBuildTool" \
                                 Description="Assembling \$(InputFileName)" \
-                                CommandLine="$(eval echo \$asm_${cfg}_cmdline)" \
-                                Outputs="\$(InputName).obj" \
+                                CommandLine="$(eval echo \$asm_${cfg}_cmdline) -o \$(IntDir)\\$objf" \
+                                Outputs="\$(IntDir)\\$objf" \
 
                             close_tag FileConfiguration
                         done
                     done
                 fi
+                if [ "$pat" == "c" ] || \
+                   [ "$pat" == "cc" ] || [ "$pat" == "cpp" ]; then
+                    for plat in "${platforms[@]}"; do
+                        for cfg in Debug Release; do
+                            open_tag FileConfiguration \
+                                Name="${cfg}|${plat}" \
 
+                            tag Tool \
+                                Name="VCCLCompilerTool" \
+                                ObjectFile="\$(IntDir)\\$objf" \
+
+                            close_tag FileConfiguration
+                        done
+                    done
+                fi
                 close_tag File
 
                 break
@@ -190,9 +137,13 @@ for opt in "$@"; do
         ;;
         --exe) proj_kind="exe"
         ;;
+        --dll) proj_kind="dll"
+        ;;
         --lib) proj_kind="lib"
         ;;
-        --src-path-bare=*) src_path_bare="$optval"
+        --src-path-bare=*)
+            src_path_bare=$(fix_path "$optval")
+            src_path_bare=${src_path_bare%/}
         ;;
         --static-crt) use_static_runtime=true
         ;;
@@ -206,9 +157,11 @@ for opt in "$@"; do
             esac
         ;;
         -I*)
+            opt=${opt##-I}
+            opt=$(fix_path "$opt")
             opt="${opt%/}"
-            incs="${incs}${incs:+;}&quot;${opt##-I}&quot;"
-            yasmincs="${yasmincs} ${opt}"
+            incs="${incs}${incs:+;}&quot;${opt}&quot;"
+            yasmincs="${yasmincs} -I&quot;${opt}&quot;"
         ;;
         -D*) defines="${defines}${defines:+;}${opt##-D}"
         ;;
@@ -217,9 +170,11 @@ for opt in "$@"; do
                 libdirs="${libdirs}${libdirs:+;}&quot;\$(OutDir)&quot;"
             else
                  # Also try directories for this platform/configuration
-                 libdirs="${libdirs}${libdirs:+;}&quot;${opt##-L}&quot;"
-                 libdirs="${libdirs}${libdirs:+;}&quot;${opt##-L}/\$(PlatformName)/\$(ConfigurationName)&quot;"
-                 libdirs="${libdirs}${libdirs:+;}&quot;${opt##-L}/\$(PlatformName)&quot;"
+                 opt=${opt##-L}
+                 opt=$(fix_path "$opt")
+                 libdirs="${libdirs}${libdirs:+;}&quot;${opt}&quot;"
+                 libdirs="${libdirs}${libdirs:+;}&quot;${opt}/\$(PlatformName)/\$(ConfigurationName)&quot;"
+                 libdirs="${libdirs}${libdirs:+;}&quot;${opt}/\$(PlatformName)&quot;"
             fi
         ;;
         -l*) libs="${libs}${libs:+ }${opt##-l}.lib"
@@ -227,6 +182,7 @@ for opt in "$@"; do
         -*) die_unknown $opt
         ;;
         *)
+            # The paths in file_list are fixed outside of the loop.
             file_list[${#file_list[@]}]="$opt"
             case "$opt" in
                  *.asm) uses_asm=true
@@ -235,6 +191,10 @@ for opt in "$@"; do
         ;;
     esac
 done
+
+# Make one call to fix_path for file_list to improve performance.
+fix_file_list
+
 outfile=${outfile:-/dev/stdout}
 guid=${guid:-`generate_uuid`}
 asm_use_custom_step=false
@@ -242,10 +202,15 @@ uses_asm=${uses_asm:-false}
 case "${vs_ver:-8}" in
     7) vs_ver_id="7.10"
        asm_use_custom_step=$uses_asm
+       warn_64bit='Detect64BitPortabilityProblems=true'
     ;;
     8) vs_ver_id="8.00"
+       asm_use_custom_step=$uses_asm
+       warn_64bit='Detect64BitPortabilityProblems=true'
     ;;
     9) vs_ver_id="9.00"
+       asm_use_custom_step=$uses_asm
+       warn_64bit='Detect64BitPortabilityProblems=false'
     ;;
 esac
 
@@ -284,12 +249,13 @@ esac
 case "$target" in
     x86_64*)
         platforms[0]="x64"
+        asm_Debug_cmdline="yasm -Xvc -g cv8 -f win64 ${yasmincs} &quot;\$(InputPath)&quot;"
+        asm_Release_cmdline="yasm -Xvc -f win64 ${yasmincs} &quot;\$(InputPath)&quot;"
     ;;
     x86*)
         platforms[0]="Win32"
-        # these are only used by vs7
-        asm_Debug_cmdline="yasm -Xvc -g cv8 -f \$(PlatformName) ${yasmincs} &quot;\$(InputPath)&quot;"
-        asm_Release_cmdline="yasm -Xvc -f \$(PlatformName) ${yasmincs} &quot;\$(InputPath)&quot;"
+        asm_Debug_cmdline="yasm -Xvc -g cv8 -f win32 ${yasmincs} &quot;\$(InputPath)&quot;"
+        asm_Release_cmdline="yasm -Xvc -f win32 ${yasmincs} &quot;\$(InputPath)&quot;"
     ;;
     *) die "Unsupported target $target!"
     ;;
@@ -298,6 +264,8 @@ esac
 generate_vcproj() {
     case "$proj_kind" in
         exe) vs_ConfigurationType=1
+        ;;
+        dll) vs_ConfigurationType=2
         ;;
         *)   vs_ConfigurationType=4
         ;;
@@ -318,13 +286,6 @@ generate_vcproj() {
     done
     close_tag Platforms
 
-    open_tag ToolFiles
-    case "$target" in
-        x86*) $uses_asm && tag ToolFile RelativePath="$self_dirname/../x86-msvs/yasm.rules"
-        ;;
-    esac
-    close_tag ToolFiles
-
     open_tag Configurations
     for plat in "${platforms[@]}"; do
         plat_no_ws=`echo $plat | sed 's/[^A-Za-z0-9_]/_/g'`
@@ -338,22 +299,7 @@ generate_vcproj() {
         case "$target" in
             x86*)
                 case "$name" in
-                    obj_int_extract)
-                        tag Tool \
-                            Name="VCCLCompilerTool" \
-                            Optimization="0" \
-                            AdditionalIncludeDirectories="$incs" \
-                            PreprocessorDefinitions="WIN32;DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE" \
-                            RuntimeLibrary="$debug_runtime" \
-                            WarningLevel="3" \
-                            Detect64BitPortabilityProblems="true" \
-                            DebugInformationFormat="1" \
-                    ;;
                     vpx)
-                        tag Tool \
-                            Name="VCPreBuildEventTool" \
-                            CommandLine="call obj_int_extract.bat $src_path_bare" \
-
                         tag Tool \
                             Name="VCCLCompilerTool" \
                             Optimization="0" \
@@ -362,8 +308,8 @@ generate_vcproj() {
                             RuntimeLibrary="$debug_runtime" \
                             UsePrecompiledHeader="0" \
                             WarningLevel="3" \
-                            DebugInformationFormat="1" \
-                            Detect64BitPortabilityProblems="true" \
+                            DebugInformationFormat="2" \
+                            $warn_64bit \
 
                         $uses_asm && tag Tool Name="YASM"  IncludePaths="$incs" Debug="true"
                     ;;
@@ -376,8 +322,8 @@ generate_vcproj() {
                             RuntimeLibrary="$debug_runtime" \
                             UsePrecompiledHeader="0" \
                             WarningLevel="3" \
-                            DebugInformationFormat="1" \
-                            Detect64BitPortabilityProblems="true" \
+                            DebugInformationFormat="2" \
+                            $warn_64bit \
 
                         $uses_asm && tag Tool Name="YASM"  IncludePaths="$incs" Debug="true"
                     ;;
@@ -390,12 +336,6 @@ generate_vcproj() {
                 case "$target" in
                     x86*)
                         case "$name" in
-                            obj_int_extract)
-                                tag Tool \
-                                    Name="VCLinkerTool" \
-                                    OutputFile="${name}.exe" \
-                                    GenerateDebugInformation="true" \
-                            ;;
                             *)
                                 tag Tool \
                                     Name="VCLinkerTool" \
@@ -444,24 +384,7 @@ generate_vcproj() {
         case "$target" in
             x86*)
                 case "$name" in
-                    obj_int_extract)
-                        tag Tool \
-                            Name="VCCLCompilerTool" \
-                            Optimization="2" \
-                            FavorSizeorSpeed="1" \
-                            AdditionalIncludeDirectories="$incs" \
-                            PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_NO_DEPRECATE" \
-                            RuntimeLibrary="$release_runtime" \
-                            UsePrecompiledHeader="0" \
-                            WarningLevel="3" \
-                            Detect64BitPortabilityProblems="true" \
-                            DebugInformationFormat="0" \
-                    ;;
                     vpx)
-                        tag Tool \
-                            Name="VCPreBuildEventTool" \
-                            CommandLine="call obj_int_extract.bat $src_path_bare" \
-
                         tag Tool \
                             Name="VCCLCompilerTool" \
                             Optimization="2" \
@@ -472,7 +395,7 @@ generate_vcproj() {
                             UsePrecompiledHeader="0" \
                             WarningLevel="3" \
                             DebugInformationFormat="0" \
-                            Detect64BitPortabilityProblems="true" \
+                            $warn_64bit \
 
                         $uses_asm && tag Tool Name="YASM"  IncludePaths="$incs"
                     ;;
@@ -487,7 +410,7 @@ generate_vcproj() {
                             UsePrecompiledHeader="0" \
                             WarningLevel="3" \
                             DebugInformationFormat="0" \
-                            Detect64BitPortabilityProblems="true" \
+                            $warn_64bit \
 
                         $uses_asm && tag Tool Name="YASM"  IncludePaths="$incs"
                     ;;
@@ -500,12 +423,6 @@ generate_vcproj() {
                 case "$target" in
                     x86*)
                         case "$name" in
-                            obj_int_extract)
-                                tag Tool \
-                                    Name="VCLinkerTool" \
-                                    OutputFile="${name}.exe" \
-                                    GenerateDebugInformation="true" \
-                            ;;
                             *)
                                 tag Tool \
                                     Name="VCLinkerTool" \
@@ -544,7 +461,7 @@ generate_vcproj() {
     close_tag Configurations
 
     open_tag Files
-    generate_filter srcs   "Source Files"   "c;cc;def;odl;idl;hpj;bat;asm;asmx"
+    generate_filter srcs   "Source Files"   "c;cc;cpp;def;odl;idl;hpj;bat;asm;asmx"
     generate_filter hdrs   "Header Files"   "h;hm;inl;inc;xsd"
     generate_filter resrcs "Resource Files" "rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav"
     generate_filter resrcs "Build Files"    "mk"

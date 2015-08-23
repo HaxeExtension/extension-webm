@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 ##
 ##  Copyright (c) 2010 The WebM project authors. All Rights Reserved.
 ##
@@ -24,9 +24,9 @@ out_file=${2}
 id=${3:-VERSION_STRING}
 
 git_version_id=""
-if [ -d ${source_path}/.git ]; then
+if [ -d "${source_path}/.git" ]; then
     # Source Path is a git working copy. Check for local modifications.
-    export GIT_DIR=${source_path}/.git
+    export GIT_DIR="${source_path}/.git"
     git_version_id=`git describe --match=v[0-9]* 2>/dev/null`
 fi
 

@@ -17,15 +17,17 @@
 #include <sys/types.h>
 
 #include "third_party/googletest/src/include/gtest/gtest.h"
+#include "test/acm_random.h"
+#include "vp8/encoder/onyx_int.h"
 #include "vpx/vpx_integer.h"
 #include "vpx_mem/vpx_mem.h"
-extern "C" {
-#include "vp8/encoder/onyx_int.h"
-}
+
+using libvpx_test::ACMRandom;
 
 namespace {
 
-TEST(Vp8RoiMapTest, ParameterCheck) {
+TEST(VP8RoiMapTest, ParameterCheck) {
+  ACMRandom rnd(ACMRandom::DeterministicSeed());
   int delta_q[MAX_MB_SEGMENTS] = { -2, -25, 0, 31 };
   int delta_lf[MAX_MB_SEGMENTS] = { -2, -25, 0, 31 };
   unsigned int threshold[MAX_MB_SEGMENTS] = { 0, 100, 200, 300 };
@@ -51,7 +53,7 @@ TEST(Vp8RoiMapTest, ParameterCheck) {
   cpi.common.mb_rows = 240 >> 4;
   cpi.common.mb_cols = 320 >> 4;
   const int mbs = (cpi.common.mb_rows * cpi.common.mb_cols);
-  vpx_memset(cpi.segment_feature_data, 0, sizeof(cpi.segment_feature_data));
+  memset(cpi.segment_feature_data, 0, sizeof(cpi.segment_feature_data));
 
   // Segment map
   cpi.segmentation_map = reinterpret_cast<unsigned char *>(vpx_calloc(mbs, 1));
@@ -59,9 +61,9 @@ TEST(Vp8RoiMapTest, ParameterCheck) {
   // Allocate memory for the source memory map.
   unsigned char *roi_map =
     reinterpret_cast<unsigned char *>(vpx_calloc(mbs, 1));
-  vpx_memset(&roi_map[mbs >> 2], 1, (mbs >> 2));
-  vpx_memset(&roi_map[mbs >> 1], 2, (mbs >> 2));
-  vpx_memset(&roi_map[mbs -(mbs >> 2)], 3, (mbs >> 2));
+  memset(&roi_map[mbs >> 2], 1, (mbs >> 2));
+  memset(&roi_map[mbs >> 1], 2, (mbs >> 2));
+  memset(&roi_map[mbs -(mbs >> 2)], 3, (mbs >> 2));
 
   // Do a test call with valid parameters.
   int roi_retval = vp8_set_roimap(&cpi, roi_map, cpi.common.mb_rows,
@@ -121,10 +123,10 @@ TEST(Vp8RoiMapTest, ParameterCheck) {
     for (int i = 0; i < 1000; ++i) {
       int rand_deltas[4];
       int deltas_valid;
-      rand_deltas[0] = (rand() % 160) - 80;
-      rand_deltas[1] = (rand() % 160) - 80;
-      rand_deltas[2] = (rand() % 160) - 80;
-      rand_deltas[3] = (rand() % 160) - 80;
+      rand_deltas[0] = rnd(160) - 80;
+      rand_deltas[1] = rnd(160) - 80;
+      rand_deltas[2] = rnd(160) - 80;
+      rand_deltas[3] = rnd(160) - 80;
 
       deltas_valid = ((abs(rand_deltas[0]) <= 63) &&
                       (abs(rand_deltas[1]) <= 63) &&

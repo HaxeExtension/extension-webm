@@ -8,19 +8,23 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#ifndef VP8_DECODER_DECODERTHREADING_H_
+#define VP8_DECODER_DECODERTHREADING_H_
 
-
-
-
-#ifndef _DECODER_THREADING_H
-#define _DECODER_THREADING_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if CONFIG_MULTITHREAD
-extern void vp8mt_decode_mb_rows(VP8D_COMP *pbi, MACROBLOCKD *xd);
-extern void vp8_decoder_remove_threads(VP8D_COMP *pbi);
-extern void vp8_decoder_create_threads(VP8D_COMP *pbi);
-extern void vp8mt_alloc_temp_buffers(VP8D_COMP *pbi, int width, int prev_mb_rows);
-extern void vp8mt_de_alloc_temp_buffers(VP8D_COMP *pbi, int mb_rows);
+void vp8mt_decode_mb_rows(VP8D_COMP *pbi, MACROBLOCKD *xd);
+void vp8_decoder_remove_threads(VP8D_COMP *pbi);
+void vp8_decoder_create_threads(VP8D_COMP *pbi);
+void vp8mt_alloc_temp_buffers(VP8D_COMP *pbi, int width, int prev_mb_rows);
+void vp8mt_de_alloc_temp_buffers(VP8D_COMP *pbi, int mb_rows);
 #endif
 
+#ifdef __cplusplus
+}  // extern "C"
 #endif
+
+#endif  // VP8_DECODER_DECODERTHREADING_H_

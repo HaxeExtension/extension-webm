@@ -10,7 +10,7 @@
 
 
 #include "vpx_config.h"
-#include "vpx_rtcd.h"
+#include "vp8_rtcd.h"
 #include "vpx_mem/vpx_mem.h"
 #include "blockd.h"
 
@@ -36,7 +36,6 @@ void vp8_build_intra_predictors_mby_s_c(MACROBLOCKD *x,
     case DC_PRED:
     {
         int expected_dc;
-        int i;
         int shift;
         int average = 0;
 
@@ -71,10 +70,10 @@ void vp8_build_intra_predictors_mby_s_c(MACROBLOCKD *x,
             expected_dc = 128;
         }
 
-        /*vpx_memset(ypred_ptr, expected_dc, 256);*/
+        /*memset(ypred_ptr, expected_dc, 256);*/
         for (r = 0; r < 16; r++)
         {
-            vpx_memset(ypred_ptr, expected_dc, 16);
+            memset(ypred_ptr, expected_dc, 16);
             ypred_ptr += y_stride;
         }
     }
@@ -99,7 +98,7 @@ void vp8_build_intra_predictors_mby_s_c(MACROBLOCKD *x,
         for (r = 0; r < 16; r++)
         {
 
-            vpx_memset(ypred_ptr, yleft_col[r], 16);
+            memset(ypred_ptr, yleft_col[r], 16);
             ypred_ptr += y_stride;
         }
 
@@ -168,7 +167,6 @@ void vp8_build_intra_predictors_mbuv_s_c(MACROBLOCKD *x,
     {
         int expected_udc;
         int expected_vdc;
-        int i;
         int shift;
         int Uaverage = 0;
         int Vaverage = 0;
@@ -204,12 +202,12 @@ void vp8_build_intra_predictors_mbuv_s_c(MACROBLOCKD *x,
         }
 
 
-        /*vpx_memset(upred_ptr,expected_udc,64);*/
-        /*vpx_memset(vpred_ptr,expected_vdc,64);*/
+        /*memset(upred_ptr,expected_udc,64);*/
+        /*memset(vpred_ptr,expected_vdc,64);*/
         for (i = 0; i < 8; i++)
         {
-            vpx_memset(upred_ptr, expected_udc, 8);
-            vpx_memset(vpred_ptr, expected_vdc, 8);
+            memset(upred_ptr, expected_udc, 8);
+            memset(vpred_ptr, expected_vdc, 8);
             upred_ptr += pred_stride;
             vpred_ptr += pred_stride;
         }
@@ -217,12 +215,10 @@ void vp8_build_intra_predictors_mbuv_s_c(MACROBLOCKD *x,
     break;
     case V_PRED:
     {
-        int i;
-
         for (i = 0; i < 8; i++)
         {
-            vpx_memcpy(upred_ptr, uabove_row, 8);
-            vpx_memcpy(vpred_ptr, vabove_row, 8);
+            memcpy(upred_ptr, uabove_row, 8);
+            memcpy(vpred_ptr, vabove_row, 8);
             upred_ptr += pred_stride;
             vpred_ptr += pred_stride;
         }
@@ -231,12 +227,10 @@ void vp8_build_intra_predictors_mbuv_s_c(MACROBLOCKD *x,
     break;
     case H_PRED:
     {
-        int i;
-
         for (i = 0; i < 8; i++)
         {
-            vpx_memset(upred_ptr, uleft_col[i], 8);
-            vpx_memset(vpred_ptr, vleft_col[i], 8);
+            memset(upred_ptr, uleft_col[i], 8);
+            memset(vpred_ptr, vleft_col[i], 8);
             upred_ptr += pred_stride;
             vpred_ptr += pred_stride;
         }
@@ -245,8 +239,6 @@ void vp8_build_intra_predictors_mbuv_s_c(MACROBLOCKD *x,
     break;
     case TM_PRED:
     {
-        int i;
-
         for (i = 0; i < 8; i++)
         {
             for (j = 0; j < 8; j++)

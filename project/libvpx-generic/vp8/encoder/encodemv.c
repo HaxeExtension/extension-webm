@@ -16,7 +16,7 @@
 
 #include <math.h>
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
 extern unsigned int active_section;
 #endif
 
@@ -359,20 +359,22 @@ void vp8_write_mvprobs(VP8_COMP *cpi)
     vp8_writer *const w  = cpi->bc;
     MV_CONTEXT *mvc = cpi->common.fc.mvc;
     int flags[2] = {0, 0};
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
     active_section = 4;
 #endif
     write_component_probs(
-        w, &mvc[0], &vp8_default_mv_context[0], &vp8_mv_update_probs[0], cpi->MVcount[0], 0, &flags[0]
+        w, &mvc[0], &vp8_default_mv_context[0], &vp8_mv_update_probs[0],
+        cpi->mb.MVcount[0], 0, &flags[0]
     );
     write_component_probs(
-        w, &mvc[1], &vp8_default_mv_context[1], &vp8_mv_update_probs[1], cpi->MVcount[1], 1, &flags[1]
+        w, &mvc[1], &vp8_default_mv_context[1], &vp8_mv_update_probs[1],
+        cpi->mb.MVcount[1], 1, &flags[1]
     );
 
     if (flags[0] || flags[1])
         vp8_build_component_cost_table(cpi->mb.mvcost, (const MV_CONTEXT *) cpi->common.fc.mvc, flags);
 
-#ifdef ENTROPY_STATS
+#ifdef VP8_ENTROPY_STATS
     active_section = 5;
 #endif
 }

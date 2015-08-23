@@ -2,9 +2,6 @@
 
 <include name="${HXCPP}/build-tool/BuildCommon.xml"/>
 
-<set name="iphonesim" value="1" if="ios" />
-<set name="iphoneos" value="1" if="ios" unless="simulator" />
-
 <set name="mobile" value="1" if="iphone"/>
 <set name="mobile" value="1" if="android"/>
 <set name="mobile" value="1" if="webos"/>
@@ -14,11 +11,11 @@
 <set name="IOS_ARCH" value="-v7" if="HXCPP_ARMV7" />
 
 <set name="ndll-tool" value="dll" unless="iphone"/>
-<set name="ndll-tool" value="static" if="iphone"/>
+<set name="ndll-tool" value="static_link" if="iphone"/>
 <set name="name_extra" value=".iphonesim" if="iphonesim"/>
 <set name="name_extra" value=".iphoneos${IOS_ARCH}" if="iphoneos"/>
-<set name="name_extra" value="-x86" if="HXCPP_X86"/>
-<set name="name_extra" value="-v7" if="HXCPP_ARMV7"/>
+<set name="name_extra" value="-x86" if="HXCPP_X86" unless="iphoneos"/>
+<set name="name_extra" value="-v7" if="HXCPP_ARMV7" unless="iphoneos"/>
 
 <set name="name_extra" value="-x86" if="simulator" unless="iphonesim" />
 <set name="name_prefix" value="lib" if="iphone" />
@@ -106,13 +103,15 @@
 <file name="libvpx-generic/vpx/src/vpx_encoder.c" />
 <file name="libvpx-generic/vpx/src/vpx_codec.c" />
 <file name="libvpx-generic/vpx/src/vpx_image.c" />
+<file name="libvpx-generic/vpx_dsp/vpx_dsp_rtcd.c" />
 <file name="libvpx-generic/vpx_mem/vpx_mem.c" />
-<file name="libvpx-generic/vpx_scale/generic/vpxscale.c" />
+<file name="libvpx-generic/vpx_scale/vpx_scale_rtcd.c" />
+<file name="libvpx-generic/vpx_scale/generic/vpx_scale.c" />
 <file name="libvpx-generic/vpx_scale/generic/yv12config.c" />
 <file name="libvpx-generic/vpx_scale/generic/yv12extend.c" />
 <file name="libvpx-generic/vpx_scale/generic/gen_scalers.c" />
 <file name="libvpx-generic/vp8/common/alloccommon.c" />
-<file name="libvpx-generic/vp8/common/asm_com_offsets.c" />
+<!-- <file name="libvpx-generic/vp8/common/asm_com_offsets.c" /> -->
 <file name="libvpx-generic/vp8/common/blockd.c" />
 <file name="libvpx-generic/vp8/common/debugmodes.c" />
 <file name="libvpx-generic/vp8/common/dequantize.c" />
@@ -126,7 +125,7 @@
 <file name="libvpx-generic/vp8/common/idct_blk.c" />
 <file name="libvpx-generic/vp8/common/idctllm.c" />
 <file name="libvpx-generic/vp8/common/rtcd.c" />
-<file name="libvpx-generic/vp8/common/loopfilter.c" />
+<file name="libvpx-generic/vp8/common/vp8_loopfilter.c" />
 <file name="libvpx-generic/vp8/common/loopfilter_filters.c" />
 <file name="libvpx-generic/vp8/common/mbpitch.c" />
 <file name="libvpx-generic/vp8/common/modecont.c" />
@@ -134,16 +133,16 @@
 <file name="libvpx-generic/vp8/common/reconinter.c" />
 <file name="libvpx-generic/vp8/common/reconintra.c" />
 <file name="libvpx-generic/vp8/common/reconintra4x4.c" />
-<file name="libvpx-generic/vp8/common/sad_c.c" />
+<!-- <file name="libvpx-generic/vp8/common/sad_c.c" /> -->
 <file name="libvpx-generic/vp8/common/setupintrarecon.c" />
 <file name="libvpx-generic/vp8/common/swapyv12buffer.c" />
-<file name="libvpx-generic/vp8/common/variance_c.c" />
+<!-- <file name="libvpx-generic/vp8/common/variance_c.c" /> -->
 <file name="libvpx-generic/vp8/common/treecoder.c" />
 <file name="libvpx-generic/vp8/vp8_dx_iface.c" />
-<file name="libvpx-generic/vp8/decoder/asm_dec_offsets.c" />
+<!-- <file name="libvpx-generic/vp8/decoder/asm_dec_offsets.c" /> -->
 <file name="libvpx-generic/vp8/decoder/dboolhuff.c" />
 <file name="libvpx-generic/vp8/decoder/decodemv.c" />
-<file name="libvpx-generic/vp8/decoder/decodframe.c" />
+<file name="libvpx-generic/vp8/decoder/decodeframe.c" />
 <file name="libvpx-generic/vp8/decoder/detokenize.c" />
 <file name="libvpx-generic/vp8/decoder/onyxd_if.c" />
 <file name="libvpx-generic/vpx_config.c" />

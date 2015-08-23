@@ -9,8 +9,6 @@
 ##
 
 
-include $(SRC_PATH_BARE)/$(VP8_PREFIX)vp8_common.mk
-
 VP8_DX_EXPORTS += exports_dec
 
 VP8_DX_SRCS-yes += $(VP8_COMMON_SRCS-yes)
@@ -18,36 +16,13 @@ VP8_DX_SRCS-no  += $(VP8_COMMON_SRCS-no)
 VP8_DX_SRCS_REMOVE-yes += $(VP8_COMMON_SRCS_REMOVE-yes)
 VP8_DX_SRCS_REMOVE-no  += $(VP8_COMMON_SRCS_REMOVE-no)
 
+VP8_DX_SRCS-yes += vp8dx.mk
+
 VP8_DX_SRCS-yes += vp8_dx_iface.c
 
-# common
-#define ARM
-#define DISABLE_THREAD
-
-#INCLUDES += algo/vpx_common/vpx_mem/include
-#INCLUDES += common
-#INCLUDES += common
-#INCLUDES += common
-#INCLUDES += common
-#INCLUDES += decoder
-
-
-
-# decoder
-#define ARM
-#define DISABLE_THREAD
-
-#INCLUDES += algo/vpx_common/vpx_mem/include
-#INCLUDES += common
-#INCLUDES += common
-#INCLUDES += common
-#INCLUDES += common
-#INCLUDES += decoder
-
-VP8_DX_SRCS-yes += decoder/asm_dec_offsets.c
 VP8_DX_SRCS-yes += decoder/dboolhuff.c
 VP8_DX_SRCS-yes += decoder/decodemv.c
-VP8_DX_SRCS-yes += decoder/decodframe.c
+VP8_DX_SRCS-yes += decoder/decodeframe.c
 VP8_DX_SRCS-yes += decoder/detokenize.c
 VP8_DX_SRCS-$(CONFIG_ERROR_CONCEALMENT) += decoder/ec_types.h
 VP8_DX_SRCS-$(CONFIG_ERROR_CONCEALMENT) += decoder/error_concealment.h

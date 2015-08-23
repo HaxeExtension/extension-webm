@@ -9,8 +9,8 @@
  */
 
 
-#ifndef __INC_VP8_INT_H
-#define __INC_VP8_INT_H
+#ifndef VP8_ENCODER_ONYX_INT_H_
+#define VP8_ENCODER_ONYX_INT_H_
 
 #include <stdio.h>
 #include "vpx_config.h"
@@ -18,9 +18,9 @@
 #include "treewriter.h"
 #include "tokenize.h"
 #include "vp8/common/onyxc_int.h"
-#include "vp8/common/variance.h"
+#include "vpx_dsp/variance.h"
 #include "encodemb.h"
-#include "quantize.h"
+#include "vp8/encoder/quantize.h"
 #include "vp8/common/entropy.h"
 #include "vp8/common/threading.h"
 #include "vpx_ports/mem.h"
@@ -33,6 +33,10 @@
 #include "vp8/encoder/denoising.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MIN_GF_INTERVAL             4
 #define DEFAULT_GF_INTERVAL         7
 
@@ -43,7 +47,7 @@
 #define AF_THRESH   25
 #define AF_THRESH2  100
 #define ARF_DECAY_THRESH 12
-#define MAX_MODES 20
+
 
 #define MIN_THRESHMULT  32
 #define MAX_THRESHMULT  512
@@ -56,9 +60,6 @@
 #if !(CONFIG_REALTIME_ONLY)
 #define VP8_TEMPORAL_ALT_REF 1
 #endif
-
-#define MAX(x,y) (((x)>(y))?(x):(y))
-#define MIN(x,y) (((x)<(y))?(x):(y))
 
 typedef struct
 {
@@ -232,7 +233,7 @@ enum
 typedef struct
 {
     /* Layer configuration */
-    double frame_rate;
+    double framerate;
     int target_bandwidth;
 
     /* Layer specific coding parameters */
@@ -282,17 +283,17 @@ typedef struct VP8_COMP
 {
 
     DECLARE_ALIGNED(16, short, Y1quant[QINDEX_RANGE][16]);
-    DECLARE_ALIGNED(16, unsigned char, Y1quant_shift[QINDEX_RANGE][16]);
+    DECLARE_ALIGNED(16, short, Y1quant_shift[QINDEX_RANGE][16]);
     DECLARE_ALIGNED(16, short, Y1zbin[QINDEX_RANGE][16]);
     DECLARE_ALIGNED(16, short, Y1round[QINDEX_RANGE][16]);
 
     DECLARE_ALIGNED(16, short, Y2quant[QINDEX_RANGE][16]);
-    DECLARE_ALIGNED(16, unsigned char, Y2quant_shift[QINDEX_RANGE][16]);
+    DECLARE_ALIGNED(16, short, Y2quant_shift[QINDEX_RANGE][16]);
     DECLARE_ALIGNED(16, short, Y2zbin[QINDEX_RANGE][16]);
     DECLARE_ALIGNED(16, short, Y2round[QINDEX_RANGE][16]);
 
     DECLARE_ALIGNED(16, short, UVquant[QINDEX_RANGE][16]);
-    DECLARE_ALIGNED(16, unsigned char, UVquant_shift[QINDEX_RANGE][16]);
+    DECLARE_ALIGNED(16, short, UVquant_shift[QINDEX_RANGE][16]);
     DECLARE_ALIGNED(16, short, UVzbin[QINDEX_RANGE][16]);
     DECLARE_ALIGNED(16, short, UVround[QINDEX_RANGE][16]);
 
@@ -320,6 +321,7 @@ typedef struct VP8_COMP
     YV12_BUFFER_CONFIG scaled_source;
     YV12_BUFFER_CONFIG *last_frame_unscaled_source;
 
+    unsigned int frames_till_alt_ref_frame;
     /* frame in src_buffers has been identified to be encoded as an alt ref */
     int source_alt_ref_pending;
     /* an alt ref frame has been encoded and is usable */
@@ -349,13 +351,8 @@ typedef struct VP8_COMP
     int ambient_err;
 
     unsigned int mode_check_freq[MAX_MODES];
-    unsigned int mode_test_hit_counts[MAX_MODES];
-    unsigned int mode_chosen_counts[MAX_MODES];
-    unsigned int mbs_tested_so_far;
 
-    int rd_thresh_mult[MAX_MODES];
     int rd_baseline_thresh[MAX_MODES];
-    int rd_threshes[MAX_MODES];
 
     int RDMULT;
     int RDDIV ;
@@ -363,9 +360,7 @@ typedef struct VP8_COMP
     CODING_CONTEXT coding_context;
 
     /* Rate targetting variables */
-    int64_t prediction_error;
     int64_t last_prediction_error;
-    int64_t intra_error;
     int64_t last_intra_error;
 
     int this_frame_target;
@@ -376,6 +371,7 @@ typedef struct VP8_COMP
     double key_frame_rate_correction_factor;
     double gf_rate_correction_factor;
 
+    unsigned int frames_since_golden;
     /* Count down till next GF */
     int frames_till_gf_update_due;
 
@@ -408,7 +404,7 @@ typedef struct VP8_COMP
     /* Minimum allocation that should be used for any frame */
     int min_frame_bandwidth;
     int inter_frame_target;
-    double output_frame_rate;
+    double output_framerate;
     int64_t last_time_stamp_seen;
     int64_t last_end_time_stamp_seen;
     int64_t first_time_stamp_ever;
@@ -418,18 +414,12 @@ typedef struct VP8_COMP
     int ni_frames;
     int avg_frame_qindex;
 
-    int zbin_over_quant;
-    int zbin_mode_boost;
-    int zbin_mode_boost_enabled;
-    int last_zbin_over_quant;
-    int last_zbin_mode_boost;
-
     int64_t total_byte_count;
 
     int buffered_mode;
 
-    double frame_rate;
-    double ref_frame_rate;
+    double framerate;
+    double ref_framerate;
     int64_t buffer_level;
     int64_t bits_off_target;
 
@@ -451,13 +441,6 @@ typedef struct VP8_COMP
 
     int drop_frames_allowed; /* Are we permitted to drop frames? */
     int drop_frame;          /* Drop this frame? */
-
-    int ymode_count [VP8_YMODES];        /* intra MB type cts this frame */
-    int uv_mode_count[VP8_UV_MODES];     /* intra MB type cts this frame */
-
-    unsigned int MVcount [2] [MVvals];  /* (row,col) MV cts this frame */
-
-    unsigned int coef_counts [BLOCK_TYPES] [COEF_BANDS] [PREV_COEF_CONTEXTS] [MAX_ENTROPY_TOKENS];  /* for this frame */
 
     vp8_prob frame_coef_probs [BLOCK_TYPES] [COEF_BANDS] [PREV_COEF_CONTEXTS] [ENTROPY_NODES];
     char update_probs [BLOCK_TYPES] [COEF_BANDS] [PREV_COEF_CONTEXTS] [ENTROPY_NODES];
@@ -486,7 +469,6 @@ typedef struct VP8_COMP
     int Speed;
     int compressor_speed;
 
-    int interquantizer;
     int auto_gold;
     int auto_adjust_gold_quantizer;
     int auto_worst_q;
@@ -502,25 +484,16 @@ typedef struct VP8_COMP
     int last_skip_probs_q[3];
     int recent_ref_frame_usage[MAX_REF_FRAMES];
 
-    int count_mb_ref_frame_usage[MAX_REF_FRAMES];
     int this_frame_percent_intra;
     int last_frame_percent_intra;
 
     int ref_frame_flags;
 
     SPEED_FEATURES sf;
-    int error_bins[1024];
 
-    /* Data used for real time conferencing mode to help determine if it
-     * would be good to update the gf
-     */
-    int inter_zz_count;
     /* Count ZEROMV on all reference frames. */
     int zeromv_count;
     int lf_zeromv_pct;
-    int gf_bad_count;
-    int gf_update_recommended;
-    int skip_true_count;
 
     unsigned char *segmentation_map;
     signed char segment_feature_data[MB_LVL_MAX][MAX_MB_SEGMENTS];
@@ -538,6 +511,22 @@ typedef struct VP8_COMP
     int cyclic_refresh_mode_index;
     int cyclic_refresh_q;
     signed char *cyclic_refresh_map;
+    // Count on how many (consecutive) times a macroblock uses ZER0MV_LAST.
+    unsigned char *consec_zero_last;
+    // Counter that is reset when a block is checked for a mode-bias against
+    // ZEROMV_LASTREF.
+    unsigned char *consec_zero_last_mvbias;
+
+    // Frame counter for the temporal pattern. Counter is rest when the temporal
+    // layers are changed dynamically (run-time change).
+    unsigned int temporal_pattern_counter;
+    // Temporal layer id.
+    int temporal_layer_id;
+
+    // Measure of average squared difference between source and denoised signal.
+    int mse_source_denoised;
+
+    int force_maxqp;
 
 #if CONFIG_MULTITHREAD
     /* multithread data */
@@ -616,7 +605,7 @@ typedef struct VP8_COMP
         /* Error score of frames still to be coded in kf group */
         int64_t kf_group_error_left;
         /* Projected Bits available for a group including 1 GF or ARF */
-        int gf_group_bits;
+        int64_t gf_group_bits;
         /* Bits for the golden frame or ARF */
         int gf_bits;
         int alt_extra_bits;
@@ -659,7 +648,6 @@ typedef struct VP8_COMP
     /* Per MB activity measurement */
     unsigned int activity_avg;
     unsigned int * mb_activity_map;
-    int * mb_norm_activity_map;
 
     /* Record of which MBs still refer to last golden frame either
      * directly or through 0,0
@@ -678,6 +666,9 @@ typedef struct VP8_COMP
     int force_next_frame_intra;
 
     int droppable;
+
+    int initial_width;
+    int initial_height;
 
 #if CONFIG_TEMPORAL_DENOISING
     VP8_DENOISER denoiser;
@@ -706,9 +697,11 @@ typedef struct VP8_COMP
     int    mr_low_res_mb_cols;
     /* Indicate if lower-res mv info is available */
     unsigned char  mr_low_res_mv_avail;
+#endif
     /* The frame number of each reference frames */
     unsigned int current_ref_frames[MAX_REF_FRAMES];
-#endif
+    // Closest reference frame to current frame.
+    MV_REFERENCE_FRAME closest_reference_frame;
 
     struct rd_costs_struct
     {
@@ -723,13 +716,15 @@ typedef struct VP8_COMP
     } rd_costs;
 } VP8_COMP;
 
-void control_data_rate(VP8_COMP *cpi);
+void vp8_alloc_compressor_data(VP8_COMP *cpi);
+int vp8_reverse_trans(int x);
+void vp8_new_framerate(VP8_COMP *cpi, double framerate);
+void vp8_loopfilter_frame(VP8_COMP *cpi, VP8_COMMON *cm);
 
-void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest, unsigned char *dest_end, unsigned long *size);
+void vp8_pack_bitstream(VP8_COMP *cpi, unsigned char *dest,
+                        unsigned char *dest_end, unsigned long *size);
 
-int rd_cost_intra_mb(MACROBLOCKD *x);
-
-void vp8_tokenize_mb(VP8_COMP *, MACROBLOCKD *, TOKENEXTRA **);
+void vp8_tokenize_mb(VP8_COMP *, MACROBLOCK *, TOKENEXTRA **);
 
 void vp8_set_speed_features(VP8_COMP *cpi);
 
@@ -749,4 +744,8 @@ void vp8_set_speed_features(VP8_COMP *cpi);
                                "Failed to allocate "#lval);\
     } while(0)
 #endif
+#ifdef __cplusplus
+}  // extern "C"
 #endif
+
+#endif  // VP8_ENCODER_ONYX_INT_H_

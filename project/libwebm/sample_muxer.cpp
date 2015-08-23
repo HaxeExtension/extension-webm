@@ -23,7 +23,13 @@
 
 #include "sample_muxer_metadata.h"
 
+using mkvmuxer::int64;
 using mkvmuxer::uint64;
+
+#ifdef _MSC_VER
+// Disable MSVC warnings that suggest making code non-portable.
+#pragma warning(disable : 4996)
+#endif
 
 namespace {
 
@@ -45,6 +51,7 @@ void Usage() {
   printf("  -audio_track_number <int>   >0 Changes the audio track number\n");
   printf("  -video_track_number <int>   >0 Changes the video track number\n");
   printf("  -chunking <string>          Chunk output\n");
+  printf("  -copy_tags <int>            >0 Copies the tags\n");
   printf("\n");
   printf("Video options:\n");
   printf("  -display_width <int>        Display width in pixels\n");
@@ -53,16 +60,19 @@ void Usage() {
   printf("\n");
   printf("Cues options:\n");
   printf("  -output_cues_block_number <int> >0 outputs cue block number\n");
+  printf("  -cues_before_clusters <int> >0 puts Cues before Clusters\n");
   printf("\n");
   printf("Metadata options:\n");
-  printf("  -webvtt-subtitles <vttfile>    "
-         "add WebVTT subtitles as metadata track\n");
-  printf("  -webvtt-captions <vttfile>     "
-         "add WebVTT captions as metadata track\n");
-  printf("  -webvtt-descriptions <vttfile> "
-         "add WebVTT descriptions as metadata track\n");
-  printf("  -webvtt-metadata <vttfile>     "
-         "add WebVTT subtitles as metadata track\n");
+  printf("  -webvtt-subtitles <vttfile>    ");
+  printf("add WebVTT subtitles as metadata track\n");
+  printf("  -webvtt-captions <vttfile>     ");
+  printf("add WebVTT captions as metadata track\n");
+  printf("  -webvtt-descriptions <vttfile> ");
+  printf("add WebVTT descriptions as metadata track\n");
+  printf("  -webvtt-metadata <vttfile>     ");
+  printf("add WebVTT subtitles as metadata track\n");
+  printf("  -webvtt-chapters <vttfile>     ");
+  printf("add WebVTT chapters as MKV chapters element\n");
 }
 
 struct MetadataFile {
@@ -73,9 +83,8 @@ struct MetadataFile {
 typedef std::list<MetadataFile> metadata_files_t;
 
 // Cache the WebVTT filenames specified as command-line args.
-bool LoadMetadataFiles(
-    const metadata_files_t& files,
-    SampleMuxerMetadata* metadata) {
+bool LoadMetadataFiles(const metadata_files_t& files,
+                       SampleMuxerMetadata* metadata) {
   typedef metadata_files_t::const_iterator iter_t;
 
   iter_t i = files.begin();
@@ -91,21 +100,21 @@ bool LoadMetadataFiles(
   return true;
 }
 
-int ParseArgWebVTT(
-    char* argv[],
-    int* argv_index,
-    int argc_check,
-    metadata_files_t* metadata_files) {
+int ParseArgWebVTT(char* argv[], int* argv_index, int argc_check,
+                   metadata_files_t* metadata_files) {
   int& i = *argv_index;
 
-  enum { kCount = 4 };
-  struct Arg { const char* name; SampleMuxerMetadata::Kind kind; };
-  const Arg args[kCount] = {
-    { "-webvtt-subtitles", SampleMuxerMetadata::kSubtitles },
-    { "-webvtt-captions", SampleMuxerMetadata::kCaptions },
-    { "-webvtt-descriptions", SampleMuxerMetadata::kDescriptions },
-    { "-webvtt-metadata", SampleMuxerMetadata::kMetadata }
+  enum { kCount = 5 };
+  struct Arg {
+    const char* name;
+    SampleMuxerMetadata::Kind kind;
   };
+  const Arg args[kCount] = {
+      {"-webvtt-subtitles", SampleMuxerMetadata::kSubtitles},
+      {"-webvtt-captions", SampleMuxerMetadata::kCaptions},
+      {"-webvtt-descriptions", SampleMuxerMetadata::kDescriptions},
+      {"-webvtt-metadata", SampleMuxerMetadata::kMetadata},
+      {"-webvtt-chapters", SampleMuxerMetadata::kChapters}};
 
   for (int idx = 0; idx < kCount; ++idx) {
     const Arg& arg = args[idx];
@@ -142,14 +151,16 @@ int main(int argc, char* argv[]) {
   bool output_audio = true;
   bool live_mode = false;
   bool output_cues = true;
+  bool cues_before_clusters = false;
   bool cues_on_video_track = true;
   bool cues_on_audio_track = false;
   uint64 max_cluster_duration = 0;
   uint64 max_cluster_size = 0;
   bool switch_tracks = false;
-  int audio_track_number = 0; // 0 tells muxer to decide.
-  int video_track_number = 0; // 0 tells muxer to decide.
+  int audio_track_number = 0;  // 0 tells muxer to decide.
+  int video_track_number = 0;  // 0 tells muxer to decide.
   bool chunking = false;
+  bool copy_tags = false;
   const char* chunk_name = NULL;
 
   bool output_cues_block_number = true;
@@ -179,6 +190,8 @@ int main(int argc, char* argv[]) {
       live_mode = strtol(argv[++i], &end, 10) == 0 ? false : true;
     } else if (!strcmp("-output_cues", argv[i]) && i < argc_check) {
       output_cues = strtol(argv[++i], &end, 10) == 0 ? false : true;
+    } else if (!strcmp("-cues_before_clusters", argv[i]) && i < argc_check) {
+      cues_before_clusters = strtol(argv[++i], &end, 10) == 0 ? false : true;
     } else if (!strcmp("-cues_on_video_track", argv[i]) && i < argc_check) {
       cues_on_video_track = strtol(argv[++i], &end, 10) == 0 ? false : true;
       if (cues_on_video_track)
@@ -189,8 +202,7 @@ int main(int argc, char* argv[]) {
         cues_on_video_track = false;
     } else if (!strcmp("-max_cluster_duration", argv[i]) && i < argc_check) {
       const double seconds = strtod(argv[++i], &end);
-      max_cluster_duration =
-          static_cast<uint64>(seconds * 1000000000.0);
+      max_cluster_duration = static_cast<uint64>(seconds * 1000000000.0);
     } else if (!strcmp("-max_cluster_size", argv[i]) && i < argc_check) {
       max_cluster_size = strtol(argv[++i], &end, 10);
     } else if (!strcmp("-switch_tracks", argv[i]) && i < argc_check) {
@@ -202,6 +214,8 @@ int main(int argc, char* argv[]) {
     } else if (!strcmp("-chunking", argv[i]) && i < argc_check) {
       chunking = true;
       chunk_name = argv[++i];
+    } else if (!strcmp("-copy_tags", argv[i]) && i < argc_check) {
+      copy_tags = strtol(argv[++i], &end, 10) == 0 ? false : true;
     } else if (!strcmp("-display_width", argv[i]) && i < argc_check) {
       display_width = strtol(argv[++i], &end, 10);
     } else if (!strcmp("-display_height", argv[i]) && i < argc_check) {
@@ -236,9 +250,8 @@ int main(int argc, char* argv[]) {
   ebml_header.Parse(&reader, pos);
 
   mkvparser::Segment* parser_segment;
-  long long ret = mkvparser::Segment::CreateInstance(&reader,
-                                                     pos,
-                                                     parser_segment);
+  long long ret =
+      mkvparser::Segment::CreateInstance(&reader, pos, parser_segment);
   if (ret) {
     printf("\n Segment::CreateInstance() failed.");
     return EXIT_FAILURE;
@@ -256,7 +269,8 @@ int main(int argc, char* argv[]) {
   // Set muxer header info
   mkvmuxer::MkvWriter writer;
 
-  if (!writer.Open(output)) {
+  char* temp_file = tmpnam(NULL);
+  if (!writer.Open(cues_before_clusters ? temp_file : output)) {
     printf("\n Filename is invalid or error while opening.\n");
     return EXIT_FAILURE;
   }
@@ -288,11 +302,26 @@ int main(int argc, char* argv[]) {
   info->set_timecode_scale(timeCodeScale);
   info->set_writing_app("sample_muxer");
 
+  const mkvparser::Tags* const tags = parser_segment->GetTags();
+  if (copy_tags && tags) {
+    for (int i = 0; i < tags->GetTagCount(); i++) {
+      const mkvparser::Tags::Tag* const tag = tags->GetTag(i);
+      mkvmuxer::Tag* muxer_tag = muxer_segment.AddTag();
+
+      for (int j = 0; j < tag->GetSimpleTagCount(); j++) {
+        const mkvparser::Tags::SimpleTag* const simple_tag =
+            tag->GetSimpleTag(j);
+        muxer_tag->add_simple_tag(simple_tag->GetTagName(),
+                                  simple_tag->GetTagString());
+      }
+    }
+  }
+
   // Set Tracks element attributes
   const mkvparser::Tracks* const parser_tracks = parser_segment->GetTracks();
   unsigned long i = 0;
-  uint64 vid_track = 0; // no track added
-  uint64 aud_track = 0; // no track added
+  uint64 vid_track = 0;  // no track added
+  uint64 aud_track = 0;  // no track added
 
   using mkvparser::Track;
 
@@ -316,7 +345,7 @@ int main(int argc, char* argv[]) {
       // Get the video track from the parser
       const mkvparser::VideoTrack* const pVideoTrack =
           static_cast<const mkvparser::VideoTrack*>(parser_track);
-      const long long width =  pVideoTrack->GetWidth();
+      const long long width = pVideoTrack->GetWidth();
       const long long height = pVideoTrack->GetHeight();
 
       // Add the video track to the muxer
@@ -328,9 +357,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
       }
 
-      mkvmuxer::VideoTrack* const video =
-          static_cast<mkvmuxer::VideoTrack*>(
-              muxer_segment.GetTrackByNumber(vid_track));
+      mkvmuxer::VideoTrack* const video = static_cast<mkvmuxer::VideoTrack*>(
+          muxer_segment.GetTrackByNumber(vid_track));
       if (!video) {
         printf("\n Could not get video track.\n");
         return EXIT_FAILURE;
@@ -338,6 +366,8 @@ int main(int argc, char* argv[]) {
 
       if (track_name)
         video->set_name(track_name);
+
+      video->set_codec_id(pVideoTrack->GetCodecId());
 
       if (display_width > 0)
         video->set_display_width(display_width);
@@ -354,7 +384,7 @@ int main(int argc, char* argv[]) {
       // Get the audio track from the parser
       const mkvparser::AudioTrack* const pAudioTrack =
           static_cast<const mkvparser::AudioTrack*>(parser_track);
-      const long long channels =  pAudioTrack->GetChannels();
+      const long long channels = pAudioTrack->GetChannels();
       const double sample_rate = pAudioTrack->GetSamplingRate();
 
       // Add the audio track to the muxer
@@ -366,9 +396,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
       }
 
-      mkvmuxer::AudioTrack* const audio =
-          static_cast<mkvmuxer::AudioTrack*>(
-              muxer_segment.GetTrackByNumber(aud_track));
+      mkvmuxer::AudioTrack* const audio = static_cast<mkvmuxer::AudioTrack*>(
+          muxer_segment.GetTrackByNumber(aud_track));
       if (!audio) {
         printf("\n Could not get audio track.\n");
         return EXIT_FAILURE;
@@ -376,6 +405,8 @@ int main(int argc, char* argv[]) {
 
       if (track_name)
         audio->set_name(track_name);
+
+      audio->set_codec_id(pAudioTrack->GetCodecId());
 
       size_t private_size;
       const unsigned char* const private_data =
@@ -390,6 +421,11 @@ int main(int argc, char* argv[]) {
       const long long bit_depth = pAudioTrack->GetBitDepth();
       if (bit_depth > 0)
         audio->set_bit_depth(bit_depth);
+
+      if (pAudioTrack->GetCodecDelay())
+        audio->set_codec_delay(pAudioTrack->GetCodecDelay());
+      if (pAudioTrack->GetSeekPreRoll())
+        audio->set_seek_pre_roll(pAudioTrack->GetSeekPreRoll());
     }
   }
 
@@ -406,6 +442,9 @@ int main(int argc, char* argv[]) {
   }
 
   if (!LoadMetadataFiles(metadata_files, &metadata))
+    return EXIT_FAILURE;
+
+  if (!metadata.AddChapters())
     return EXIT_FAILURE;
 
   // Set Cues element attributes
@@ -427,18 +466,24 @@ int main(int argc, char* argv[]) {
 
     long status = cluster->GetFirst(block_entry);
 
-    if (status)
-    {
-        printf("\n Could not get first block of cluster.\n");
-        return EXIT_FAILURE;
+    if (status) {
+      printf("\n Could not get first block of cluster.\n");
+      return EXIT_FAILURE;
     }
 
     while ((block_entry != NULL) && !block_entry->EOS()) {
       const mkvparser::Block* const block = block_entry->GetBlock();
       const long long trackNum = block->GetTrackNumber();
       const mkvparser::Track* const parser_track =
-          parser_tracks->GetTrackByNumber(
-              static_cast<unsigned long>(trackNum));
+          parser_tracks->GetTrackByNumber(static_cast<unsigned long>(trackNum));
+
+      // When |parser_track| is NULL, it means that the track number in the
+      // Block is invalid (i.e.) the was no TrackEntry corresponding to the
+      // track number. So we reject the file.
+      if (!parser_track) {
+        return EXIT_FAILURE;
+      }
+
       const long long track_type = parser_track->GetType();
       const long long time_ns = block->GetTime(cluster);
 
@@ -450,13 +495,12 @@ int main(int argc, char* argv[]) {
       if ((track_type == Track::kAudio && output_audio) ||
           (track_type == Track::kVideo && output_video)) {
         const int frame_count = block->GetFrameCount();
-        const bool is_key = block->IsKey();
 
         for (int i = 0; i < frame_count; ++i) {
           const mkvparser::Block::Frame& frame = block->GetFrame(i);
 
           if (frame.len > data_len) {
-            delete [] data;
+            delete[] data;
             data = new unsigned char[frame.len];
             if (!data)
               return EXIT_FAILURE;
@@ -466,15 +510,16 @@ int main(int argc, char* argv[]) {
           if (frame.Read(&reader, data))
             return EXIT_FAILURE;
 
-          uint64 track_num = vid_track;
-          if (track_type == Track::kAudio)
-            track_num = aud_track;
-
-          if (!muxer_segment.AddFrame(data,
-                                      frame.len,
-                                      track_num,
-                                      time_ns,
-                                      is_key)) {
+          mkvmuxer::Frame muxer_frame;
+          if (!muxer_frame.Init(data, frame.len))
+            return EXIT_FAILURE;
+          muxer_frame.set_track_number(track_type == Track::kAudio ? aud_track :
+                                                                     vid_track);
+          if (block->GetDiscardPadding())
+            muxer_frame.set_discard_padding(block->GetDiscardPadding());
+          muxer_frame.set_timestamp(time_ns);
+          muxer_frame.set_is_key(block->IsKey());
+          if (!muxer_segment.AddGenericFrame(&muxer_frame)) {
             printf("\n Could not add frame.\n");
             return EXIT_FAILURE;
           }
@@ -483,10 +528,9 @@ int main(int argc, char* argv[]) {
 
       status = cluster->GetNext(block_entry, block_entry);
 
-      if (status)
-      {
-          printf("\n Could not get next block of cluster.\n");
-          return EXIT_FAILURE;
+      if (status) {
+        printf("\n Could not get next block of cluster.\n");
+        return EXIT_FAILURE;
       }
     }
 
@@ -498,13 +542,34 @@ int main(int argc, char* argv[]) {
   if (!metadata.Write(-1))
     return EXIT_FAILURE;
 
-  muxer_segment.Finalize();
+  if (!muxer_segment.Finalize()) {
+    printf("Finalization of segment failed.\n");
+    return EXIT_FAILURE;
+  }
 
-  delete [] data;
-  delete parser_segment;
-
-  writer.Close();
   reader.Close();
+  writer.Close();
+
+  if (cues_before_clusters) {
+    if (reader.Open(temp_file)) {
+      printf("\n Filename is invalid or error while opening.\n");
+      return EXIT_FAILURE;
+    }
+    if (!writer.Open(output)) {
+      printf("\n Filename is invalid or error while opening.\n");
+      return EXIT_FAILURE;
+    }
+    if (!muxer_segment.CopyAndMoveCuesBeforeClusters(&reader, &writer)) {
+      printf("\n Unable to copy and move cues before clusters.\n");
+      return EXIT_FAILURE;
+    }
+    reader.Close();
+    writer.Close();
+    remove(temp_file);
+  }
+
+  delete[] data;
+  delete parser_segment;
 
   return EXIT_SUCCESS;
 }
