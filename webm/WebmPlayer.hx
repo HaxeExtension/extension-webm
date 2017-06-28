@@ -19,7 +19,7 @@ class WebmPlayer extends Bitmap
 {
 	static inline var BYTES_PER_SAMPLE = 4 * 8192;
 	static var BLANK_BYTES:ByteArray;
-	static var SKIP_STEP_LIMIT = 1;
+	static var SKIP_STEP_LIMIT = 0;
 
 	public var frameRate(default, null):Float;
 	public var duration(default, null):Float;
