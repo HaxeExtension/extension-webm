@@ -27,7 +27,8 @@ pushd ../libs.src/libvpx
 
 # LIBVPX
 cd ../libvpx && \
-./configure --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder && \
+yasm --version && \
+./configure --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder --disable-vp9-encoder --disable-vp9-decoder&& \
 make clean && \
 make && \
 #sudo make install && \
