@@ -155,11 +155,11 @@
 		<ext value=".so" />
 		<ext value=".ndll" if="windows || mac || linux" />
 		
-		<flag value="-libpath:../libs/Windows" if="windows"/>
+		<!--<flag value="-libpath:../libs/Windows" if="windows"/>
 		<lib name="vpx.lib" if="windows"/>
 		
 		<flag value="-L../libs/Linux" if="linux"/>
-		<lib name="-lvpx" if="linux"/>
+		<lib name="-lvpx" if="linux"/>-->
 		<lib name="-lpthread" if="linux"/>
 		
 	</section>

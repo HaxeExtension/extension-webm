@@ -47,12 +47,12 @@
 /samples.dox
 /test_libvpx
 /vp8_api1_migration.dox
-/vp[89x]_rtcd.h
+#/vp[89x]_rtcd.h
 /vpx.pc
-/vpx_config.c
-/vpx_config.h
-/vpx_scale_rtcd.h
-/vpx_version.h
+#/vpx_config.c
+#/vpx_config.h
+#/vpx_scale_rtcd.h
+#/vpx_version.h
 /vpxdec
 /vpxdec.dox
 /vpxenc
