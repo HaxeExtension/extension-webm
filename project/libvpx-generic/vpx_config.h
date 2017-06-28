@@ -10,7 +10,13 @@
 #define VPX_CONFIG_H
 #define RESTRICT    
 #define INLINE      inline
+
+#if ((defined(IPHONEOS) && !defined(IPHONESIM)) || defined(ANDROID) && !defined(HXCPP_X86))
+#define ARCH_ARM 1
+#else
 #define ARCH_ARM 0
+#endif
+
 #define ARCH_MIPS 0
 #define ARCH_X86 0
 #define ARCH_X86_64 0
@@ -48,7 +54,7 @@
 #define CONFIG_RVCT 0
 #define CONFIG_GCC 1
 #define CONFIG_MSVS 0
-#define CONFIG_PIC 0
+#define CONFIG_PIC 1
 #define CONFIG_BIG_ENDIAN 0
 #define CONFIG_CODEC_SRCS 0
 #define CONFIG_DEBUG_LIBS 0
