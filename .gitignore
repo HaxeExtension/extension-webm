@@ -6,4 +6,5 @@
 /ndll/*/*.a
 /ndll/*/*.ndll
 /ndll/*/*.hash
+/ndll/*
 .DS_Store
