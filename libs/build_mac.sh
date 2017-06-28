@@ -33,7 +33,7 @@ export MACOSX_DEPLOYMENT_TARGET=10.8
 cd ../libvpx && \
 yasm --version && \
 #./configure --target=x86-darwin9-gcc --as=yasm --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder && \
-./configure --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder && \
+./configure --disable-examples --disable-docs --disable-unit-tests --disable-vp8-encoder --disable-vp9-encoder --disable-vp9-decoder && \
 make clean && \
 make && \
 #sudo make install && \
