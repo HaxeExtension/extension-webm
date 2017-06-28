@@ -44,7 +44,11 @@ typedef unsigned int uint32;
 typedef unsigned short uint16;
 typedef unsigned char uint8;
 
+#ifndef HX_WINDOWS
+#include <stdint.h>
+#else
 typedef uint64 uint64_t;
+#endif
 
 typedef struct {
 	value func_read;

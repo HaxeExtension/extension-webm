@@ -30,5 +30,5 @@ class WebmIo
 		return 0;
 	}
 	
-	static var hx_create_io = Lib.load("openfl-webm", "hx_create_io", 3);
+	static var hx_create_io = Lib.load("extension-webm", "hx_create_io", 3);
 }

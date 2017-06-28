@@ -142,7 +142,7 @@
 <set name="LIBSUFFIX" value="${LIBEXTRA}" unless="LIBSUFFIX" />
 
 
-<target id="NDLL" output="${LIBPREFIX}openfl-webm${DEBUGEXTRA}${LIBSUFFIX}" tool="linker" toolid="${STD_MODULE_LINK}">
+<target id="NDLL" output="${LIBPREFIX}extension-webm${DEBUGEXTRA}${LIBSUFFIX}" tool="linker" toolid="${STD_MODULE_LINK}">
 	
 	<outdir name="${OUTPUT_DIR}/${BINDIR}" />
 	
