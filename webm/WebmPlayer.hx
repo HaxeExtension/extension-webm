@@ -19,6 +19,7 @@ class WebmPlayer extends Bitmap
 {
 	static inline var BYTES_PER_SAMPLE = 4 * 8192;
 	static var BLANK_BYTES:ByteArray;
+	static var SKIP_STEP_LIMIT = 1;
 
 	public var frameRate(default, null):Float;
 	public var duration(default, null):Float;
@@ -29,6 +30,7 @@ class WebmPlayer extends Bitmap
 	var soundChannel:SoundChannel;
 	var sound:Sound;
 	var soundEnabled:Bool;
+	var skippedSteps = 0;
 	
 	var startTime = 0.0;
 	var lastDecodedVideoFrame = 0.0;
@@ -57,7 +59,7 @@ class WebmPlayer extends Bitmap
 		webmDecoder = hx_webm_decoder_create(io.io, soundEnabled);
 		
 		var info = hx_webm_decoder_get_info(webmDecoder);
-		bitmapData = new BitmapData(info[0].int(), info[1].int());
+		bitmapData = new BitmapData(info[0].int(), info[1].int(), false, 0);
 		frameRate = info[2];
 		duration = info[3];
 
@@ -148,6 +150,7 @@ class WebmPlayer extends Bitmap
 	
 	function onSpriteEnterFrame(e:Event)
 	{
+		skippedSteps = 0;
 		stepVideoFrame();
 	}
 	
@@ -177,8 +180,9 @@ class WebmPlayer extends Bitmap
 		
 		vpxDecoder.decode(data);
 		
-		if (lastDecodedVideoFrame < lastRequestedVideoFrame)
+		if (skippedSteps < SKIP_STEP_LIMIT && playing && lastDecodedVideoFrame < lastRequestedVideoFrame)
 		{
+			skippedSteps++;
 			stepVideoFrame();
 		}
 		else
