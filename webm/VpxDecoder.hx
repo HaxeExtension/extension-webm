@@ -32,16 +32,12 @@ class VpxDecoder
 		
 		if (info != null) 
 		{
-			// var buffer = bitmapData.image.buffer;
-			// buffer.data.buffer = Bytes.ofData(info[2]);
-			// buffer.format = ARGB32;
-			// buffer.premultiplied = true;
-			// bitmapData.image.format = BGRA32;
-			// bitmapData.image.version++;
-			var byteArray:ByteArray = ByteArray.fromBytes(Bytes.ofData(info[2]));
-			bitmapData.lock();
-			bitmapData.setPixels(bitmapData.rect, byteArray);
-			bitmapData.unlock();
+			var buffer = bitmapData.image.buffer;
+			buffer.data.buffer = Bytes.ofData(info[2]);
+			buffer.format = ARGB32;
+			buffer.premultiplied = true;
+			bitmapData.image.format = BGRA32;
+			bitmapData.image.version++;
 		}
 	}
 	
