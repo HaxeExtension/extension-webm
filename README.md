@@ -1,11 +1,11 @@
 ## WEBM:
 
 Information about webm:
-* http://www.webmproject.org/
+* https://www.webmproject.org/
 
 ## Setup/Installing:
 
-You need HAXE and OPENFL. http://openfl.org/
+You need Haxe and OpenFL. https://openfl.org/
 
 ```
 haxelib install openfl-webm
